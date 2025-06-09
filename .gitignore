@@ -1,0 +1,18 @@
+# Buildmaps
+build/
+.deps/
+
+# VSCode-config
+.vscode/
+
+# Makefile 
+Makefile
+
+#Compile and binaries
+*.o
+*.elf
+*.bin
+*.map
+
+lib
+.gitmodule
