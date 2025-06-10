@@ -18,16 +18,18 @@ static uint32_t spi_periph;
 static uint32_t gpio_perpih;
 
 /**
- * Reset GPIO pin
+ * Reset GPIO pin. Active LOW.
  */
 static uint32_t rst;
 /**
- * Chip select GPIO pin. Active LOW. Configured as SPI_NSS (Select slave pin) and controlled by SPI hardware
+ * Chip select GPIO pin. Active LOW. 
  */
 static uint32_t cs;
 
 /**
- * Data/Command sleection GPIO pin
+ * Data/Command selection GPIO pin. 
+ * LOW => Cmd
+ * HIGH => Data
  */
 static uint32_t dc;
 
@@ -57,32 +59,49 @@ void lcd_init(uint32_t _spi_periph, uint32_t _gpio_perpih, uint32_t clk, uint32_
 	cs = _cs;
 	dc = _dc;
 
+	/**
+	 * Init SPI As Master, 8 bit frame size, little endian and f = 27MHz
+	 */
 	spi_parameter_struct spi_param;
 	spi_param.device_mode = SPI_MASTER;
 	spi_param.trans_mode = SPI_TRANSMODE_BDTRANSMIT;
 	spi_param.frame_size = SPI_FRAMESIZE_8BIT;
-	spi_param.nss = SPI_NSS_HARD;
+	spi_param.nss = SPI_NSS_SOFT;
 	spi_param.endian = SPI_ENDIAN_LSB;
 	spi_param.clock_polarity_phase= SPI_CK_PL_LOW_PH_1EDGE;
-	spi_param.prescale = SPI_PSC_2;
+	spi_param.prescale = SPI_PSC_4;	
 
-	//Start RCU for SPI and GPIO
+	//Init spi
+	spi_init(spi_periph, &spi_param);
+
+	/**
+	 * Init GPIO
+	 */
+	//rst
+	gpio_init(gpio_perpih, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, rst);
+	gpio_bit_set(gpio_perpih, rst);
+	//cs
+	gpio_init(gpio_perpih, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, cs);
+	gpio_bit_set(gpio_perpih, cs);
+	//dc
+	gpio_init(gpio_perpih, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, dc);
+	gpio_bit_set(gpio_perpih, dc);
+	
+
+	/**
+	 * Init RCU
+	 */
 	switch(spi_periph){
 		case SPI0: rcu_periph_clock_enable(RCU_SPI0); break;
 		case SPI1: rcu_periph_clock_enable(RCU_SPI1); break;
 		case SPI2: rcu_periph_clock_enable(RCU_SPI2); break;
 	}
 
-		switch(gpio_perpih){
+	switch(gpio_perpih){
 		case GPIOA: rcu_periph_clock_enable(RCU_GPIOA); break;
 		case GPIOB: rcu_periph_clock_enable(RCU_GPIOB); break;
 		case GPIOC: rcu_periph_clock_enable(RCU_GPIOC); break;
 		case GPIOD: rcu_periph_clock_enable(RCU_GPIOD); break;
 		case GPIOE: rcu_periph_clock_enable(RCU_GPIOE); break;
 	}
-
-
-	//gpio_init();
-
-	//spi_init()
 }
