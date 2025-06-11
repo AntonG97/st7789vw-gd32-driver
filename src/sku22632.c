@@ -8,10 +8,31 @@ Libraries (other than vendor SDK and gcc libraries) must have .h-files in /lib/[
 #include "gd32vf103.h"
 #include "../include/sku22632.h"
 
+typedef enum{
+	SWRESET = 0x01,	//SW reset
+	SLPIN = 0x10,	//LCD power saving mode
+	SLPOUT = 0x11, 	//LCD turn off power saving mode
+	NORON = 0x13,	//Normal display mode on
+	INVOFF = 0x20, 	//Display inversion off
+	INVON = 0x21,	//Display inversion on
+	GAMSET = 0x26,	//Gamma set
+	DISPOFF = 0x28,	//Display OFF
+	DISPON = 0x29, 	//Display ON
+	CASET = 0x2A,	//Column adress set + 4 bytes of data
+	RASET = 0x2B,	//Row adress set + 4 bytes of data
+	RAMWR = 0x2C, 	//Memory write. Transfer data from MCU to frame mem. When cmd accepted, col and page set to start pos
+	MADCTL = 0x36,	//Memory data access control
+	COLMOD = 0x3A,	//Interface pixel format
+	WRDISBV = 0x51,	//Write display brightness + 1 byte (0x00 => Lowest 0xFF => Highest)
+}cmd;
+
+
 static void lcd_wr_data(const uint8_t data);
-static void lcd_wr_cmd(const uint8_t data);
+static void lcd_wr_cmd(const cmd data);
 static void delay_ms(uint8_t ms);
 static void lcd_queue_flush_blocking(void);
+static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye);
+static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color);
 
 /**
  * SPI base
@@ -40,28 +61,6 @@ static uint32_t cs;
  */
 static uint32_t dc;
 
-typedef enum{
-	SWRESET = 0x01,	//SW reset
-	SLPIN = 0x10,	//LCD power saving mode
-	SLPOUT = 0x11, 	//LCD turn off power saving mode
-	NORON = 0x13,	//Normal display mode on
-	INVOFF = 0x20, 	//Display inversion off
-	INVON = 0x21,	//Display inversion on
-	GAMSET = 0x26,	//Gamma set
-	DISPOFF = 0x28,	//Display OFF
-	DISPON = 0x29, 	//Display ON
-	CASET = 0x2A,	//Column adress set + 4 bytes of data
-	RASET = 0x2B,	//Row adress set + 4 bytes of data
-	RAMWR = 0x2C, 	//Memory write. Transfer data from MCU to frame mem. When cmd accepted, col and page set to start pos
-
-	MADCTL = 0x36,	//Memory data access control
-	COLMOD = 0x3A,	//Interface pixel format
-	WRDISBV = 0x51,	//Write display brightness + 1 byte (0x00 => Lowest 0xFF => Highest)
-
-
-}cmd;
-
-
 int main(void){
 
 	
@@ -71,7 +70,16 @@ int main(void){
 	gpio_bit_reset(GPIOB, GPIO_PIN_9);
 	lcd_init(SPI0, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
 	gpio_bit_set(GPIOB, GPIO_PIN_9);
+
+	int x = 0;
+	int y = 0;
 	while(1){
+		lcd_queue_flush();
+		x = (x+1) % 240;
+		if( x == 0 ) y = (y+1) % 240;
+		//y = (y+1) % 240;
+
+		lcd_drawPoint(x,y,GREEN);
 
 		//gpio_bit_set(GPIOB, GPIO_PIN_9);
 		//delay_ms(1);
@@ -157,7 +165,7 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	spi_param.nss = SPI_NSS_SOFT;
 	spi_param.endian = SPI_ENDIAN_MSB;
 	spi_param.clock_polarity_phase= SPI_CK_PL_LOW_PH_1EDGE;
-	spi_param.prescale = SPI_PSC_32;	//TODO: Change later to higher!
+	spi_param.prescale = SPI_PSC_4;	//TODO: Change later to higher!
 
 	//Init spi
 	spi_init(spi_perpih, &spi_param);
@@ -196,43 +204,25 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	//lcd_queue_flush_blocking();
 
 	//Set col(cmd 0x2A + 4 bytes) & adr (cmd 0x2B + 4 bytes) range
-	lcd_wr_cmd(CASET);
-	lcd_wr_data(0x00);
-	lcd_wr_data(0x00);
-	lcd_wr_data(0x00);
-	lcd_wr_data(0xEF);
-
-	lcd_wr_cmd(RASET);
-	lcd_wr_data(0x00);
-	lcd_wr_data(0x00);
-	lcd_wr_data(0x01);
-	lcd_wr_data(0x3F);
-	//RAMWR
-	lcd_wr_cmd(RAMWR);
+	setWindow(0, 239, 0, 239);
 
 	//lcd_queue_flush_blocking();
 
 	lcd_wr_cmd(DISPON);
-	//lcd_queue_flush_blocking();
-	//Dislpay on (cmd 0x29)	
 
-	//delay_ms(100);
-
-
-	lcd_wr_cmd(RAMWR);       // RAMWR (start writing to RAM)
-	//lcd_queue_flush_blocking();
-	for (int i = 0; i < 240*240; i++) {
-		//0xF0 MSB
-		//0x00 LSB
-		lcd_wr_data(0x07);  // High byte
-		lcd_wr_data(0xE0);  // Low byte
-	}
+	fillWindow(0, 240, 0, 240, WHITE);
 	
 	lcd_queue_flush_blocking();
 
-	//lcd_wr_cmd(WRDISBV);
-	//lcd_wr_data(0xF0);
-	//lcd_queue_flush_blocking();
+	//DBG
+	lcd_drawPoint(50,50,BLUE);
+	lcd_queue_flush_blocking();
+	setWindow(50, 150, 50, 150);
+	fillWindow(50, 150, 50, 150, BLUE);
+	lcd_queue_flush_blocking();
+	setWindow(100, 150, 100, 150);
+	fillWindow(100, 150, 100, 150, RED);
+	lcd_queue_flush_blocking();
 }
 
 static inline void dc_set(void) {
@@ -270,8 +260,6 @@ typedef struct{
  */
 spi_data buff[BUFF_SIZE] = {0};
 int tail = 0, head = 0;
-//If buffer is full => full = 1
-uint8_t full = 0;
 
 /**
  * \brief Queue for LCD. Call first in superloop
@@ -329,8 +317,6 @@ static void lcd_queue_flush_blocking(void){
     cs_set();
 }
 
-
-
 /**
  * @brief Writes data to SPI buffer to be sent
  * @param[in] data: Data to be written by SPI
@@ -345,8 +331,8 @@ static void lcd_wr(const spi_data data){
  * @brief Write LCD command
  * @param[in]: Data to be transmitted
  */
-static void lcd_wr_cmd(uint8_t data){
-	spi_data _data = {0, data};
+static void lcd_wr_cmd(const cmd data){
+	spi_data _data = {0, (uint8_t)data};
 	lcd_wr(_data);
 }
 
@@ -354,15 +340,97 @@ static void lcd_wr_cmd(uint8_t data){
  * @brief Write LCD data
  * @param[in]: Data to be transmitted
  */
-static void lcd_wr_data(uint8_t data){
+static void lcd_wr_data(const uint8_t data){
 	spi_data _data = {1, data};
 	lcd_wr(_data);
 }
-//SPI functions begin
+//SPI functions ends
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//LCD functions begin
+
+/**
+ * @brief Sets a new window
+ * @param[in] xs: col start coordinate [0 <= xs <= xe]
+ * @param[in] xe: col end coordinate [xs <= xe <= 239]
+ * @param[in] ys: row start coordinate [0 <= ys <= ye]
+ * @param[in] ye: row end coordinate [ys <= ye <= 319]
+ */
+static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye){
+
+	lcd_wr_cmd(CASET);
+	lcd_wr_data( xs >> 8 & 0xFF );
+	lcd_wr_data( xs & 0xFF);
+	lcd_wr_data( xe >> 8 & 0xFF );
+	lcd_wr_data( xe & 0xFF );
+
+	lcd_wr_cmd(RASET);
+	lcd_wr_data( ys >> 8 & 0xFF );
+	lcd_wr_data( ys & 0xFF);
+	lcd_wr_data( ye >> 8 & 0xFF );
+	lcd_wr_data( ye & 0xFF );
+	//RAMWR
+	lcd_wr_cmd(RAMWR);
+}
+
+/**
+ * @brief Sets a new window
+ * @param[in] xs: col start coordinate [0 <= xs <= xe]
+ * @param[in] xe: col end coordinate [xs <= xe <= 239]
+ * @param[in] ys: row start coordinate [0 <= ys <= ye]
+ * @param[in] ye: row end coordinate [ys <= ye <= 319]
+ */
+static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color){
+	lcd_wr_cmd(RAMWR);       // RAMWR (start writing to RAM)
+	uint16_t dx = xe - xs, dy = ye - ys;
+	for (int i = 0; i < xe*ye; i++) {
+		lcd_wr_data(((uint16_t)color >> 8) & 0xFF);  	// High byte
+		lcd_wr_data((uint16_t)color & 0xFF);  			// Low byte
+	}
+}
+
+/**
+ * @brief Draw single point
+ * @param[in] x: col start coordinate [0 <= xs <= 239]
+ * @param[in] y: row start coordinate [0 <= ys <= 319]
+ */
+void lcd_drawPoint(const uint16_t x, const uint16_t y, color color){
+	setWindow(x, x, y, y);
+	lcd_wr_data(((uint16_t)color >> 8) & 0xFF);
+	lcd_wr_data((uint16_t)color & 0xFF);
+}
+
+void lcd_drawLine(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color){
+	setWindow(xs,xe,ys,ye);
+	uint16_t dx = xe - xs, dy = ye - ys;
+
+	
+
+	x = (x+1) % 240;
+	//y = (y+1) % 240;
 
 
+			lcd_wr_data(((uint16_t)color >> 8) & 0xFF);
+			lcd_wr_data((uint16_t)color & 0xFF);
+}
 
+void lcd_drawCircle(){
+	return;
+}
+/**
+ * @brief Draw rectangle
+ * @param[in] xs: col start coordinate [0 <= xs <= xe]
+ * @param[in] xe: col end coordinate [xs <= xe <= 239]
+ * @param[in] ys: row start coordinate [0 <= ys <= ye]
+ * @param[in] ye: row end coordinate [ys <= ye <= 319]
+ */
+void lcd_drawRec(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color){
+	setWindow(xs,xe,ys,ye);
+	fillWindow(xs,xe,ys,ye, color);
+}
+
+
+//LCD functions ends
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief Delays (blocking)
  * @param[in] ms: Amount of ms to delay
