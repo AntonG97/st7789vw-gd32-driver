@@ -7,6 +7,7 @@ Libraries (other than vendor SDK and gcc libraries) must have .h-files in /lib/[
 
 #include "gd32vf103.h"
 #include "../include/sku22632.h"
+#include "../include/lcd_font.h"
 
 typedef enum{
 	SWRESET = 0x01,	//SW reset
@@ -62,66 +63,37 @@ static uint32_t cs;
  */
 static uint32_t dc;
 
+/**
+ * Variable holds the current background color set during previous call of lcd_clear()
+ */
+static color curr_backgr;
+
 int main(void){
 
 	lcd_init(SPI0, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
 
-	//DBG
-	//setWindow(50, 150, 50, 150);
-	//fillWindow(50, 150, 50, 150, BLUE);
-	//setWindow(100, 150, 100, 150);
-	//fillWindow(100, 150, 100, 150, RED);
-
-	//lcd_drawLine(1,100,1,100, RED);
-
-	/*
-	lcd_drawRec(0,120,0,50,GREEN);
-	//lcd_drawRec(0,280,230,280,RED);
-
-	lcd_drawLine(120,120,100,140, BLACK);
-	lcd_drawLine(100,140,120,120, BLACK);
-	lcd_drawLine(0,240,0,240, BLACK);
-	lcd_drawLine(0,240,240,0, BLACK);
-
-	lcd_drawCircle(190,190, 30, BLACK);
-	lcd_drawCircle_filled(100,100,20, RED);
-	lcd_clear(RED);
-	lcd_drawPixel_big(120,120,GREEN);
-	*/
-
 	lcd_drawLine(0, 240, 120, 120, BLACK);
 
-	
-	
-	int max_y = LCD_Y_MAX - 90;
-	int x = 0;
-	int y = 120;
-	int up = 1;
+	lcd_ShowCh(20,20,'2', RED, BIG);
+	lcd_ShowCh(40,20,'2', RED, SMALL);
 
+	lcd_showStr(8,100, "Hello World!!!!!!!!!!",RED, BIG);
+
+	
+	lcd_showNum(20, 200, 0, GREEN, SMALL);
+	
+	lcd_showNum_float(50,200, 222.99, 2, RED, BIG);
+	
+	//lcd_ShowCh(60,20,'A', RED);
+	uint8_t x = 0;
 	while(1){
 		lcd_queue_flush();
-		lcd_clear(RED);
-		lcd_clear(WHITE);
-		lcd_clear(GREEN);
-
-		/*
-		lcd_drawPixel_big(x,y,RED);
-
-		x = (x + 1) % LCD_X_MAX;
-		//y = ( y + 1) % LCD_Y_MAX;
 		
-		if( y == max_y ) up = 0;
-		if( y == max_y - 120 ) up = 1;
-		//Climb y upper
-		if( y >= 120 && y < max_y && up ){
-			y++;
-		}else{
-			y--;
-		}
-		//Reached upper, go down
-		//Reached down, go upp
-		
-		*/
+		lcd_drawRec_filled(10,30, 140, 180, WHITE);
+		lcd_showNum(20, 160, x++, RED, BIG);
+		x = (x % 255);
+
+
 	}
 
 	return 0;
@@ -223,9 +195,10 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	lcd_wr_cmd(MADCTL);
 	lcd_wr_data(0xA0);
 
-	lcd_drawRec_filled(0,240,0,240, WHITE); //LCD screen white
-	
+	lcd_clear(WHITE);
+
 	lcd_wr_cmd(DISPON);
+	//Write data
 	lcd_queue_flush_blocking();
 }
 
@@ -235,6 +208,7 @@ void lcd_clear(color color){
 	 	lcd_wr_data(((uint16_t)color >> 8) & 0xFF);  	// High byte
 		lcd_wr_data((uint16_t)color & 0xFF);  			// Low byte
 	}
+	curr_backgr = color;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -566,6 +540,221 @@ void lcd_drawCircle_filled(uint16_t xs, uint16_t ys, uint16_t r, color color){
             d += ((x - y) << 1)+ 1;
         }
     }
+}
+
+/**
+ * @brief Writes a character on LCD
+ * @param[in]: xs: Center x coordinate
+ * @param[in]: ys: Center y coordinate
+ * @param[in]: ch: Character that is to be written
+ * @param[in]: _color: Color of Character
+ * @param[in]: size: Size of Character
+ */
+void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, const color _color, const font_size size){
+	//Select font
+	uint8_t var_y;
+	uint8_t *font_type;
+	if( size == SMALL){};
+	if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal; }
+	if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
+	int offset = (var_y << 1) * (ch - ' ');
+
+	//Set window size
+	uint8_t x = xs - (STD_FONT_X_SIZE >> 1);				//Calc leftmost corner..-
+	uint8_t y = ys - (var_y >> 1);							
+	setWindow(x, x + STD_FONT_X_SIZE - 1, y, y + var_y - 1);//... and set window
+
+	//Write char
+	for(uint8_t i = 0; i < (var_y << 1); i++){
+		for(int8_t j = 7; j >= 0; j--){
+			//Check each bit of each element. If 0b1 => Write new col, else keep current background color
+			color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
+			lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
+			lcd_wr_data(set_color & 0xFF);  				// Low byte
+		}
+	}
+}
+
+/**
+ * @brief Writes a string on LCD
+ * @param[in]: xs: Center x coordinate
+ * @param[in]: ys: Center y coordinate
+ * @param[in]: str: String that is to be written
+ * @param[in]: _color: Color of Characters
+ * @param[in]: size: Size of Characters
+ */
+void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const color _color, const font_size size){
+	//Select font
+	uint8_t var_y;
+	uint8_t *font_type;
+	if( size == SMALL){};
+	if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
+	if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
+
+	uint8_t ind = 0;
+	//Loop until NULL
+	while( str[ind] != '\0' && ind < STD_FONT_X_SIZE ){		//While char not NULL and ind less than 16 (Max amount of chars on LCD row)
+		int offset = (var_y << 1) * (str[ind] - ' ');
+
+		//Set window size
+		uint8_t x = xs - (STD_FONT_X_SIZE >> 1) + (STD_FONT_X_SIZE * ind);				//Calc leftmost corner...
+		uint8_t y = ys - (var_y >> 1);							
+		setWindow(x, x + STD_FONT_X_SIZE - 1, y, y + var_y - 1);						//... and set window
+
+		//Write char
+		for(uint8_t i = 0; i < (var_y << 1); i++){
+			for(int8_t j = 7; j >= 0; j--){
+				//Check each bit of each element. If 0b1 => Write new col, else keep current background color
+				color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
+				lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
+				lcd_wr_data(set_color & 0xFF);  				// Low byte
+			}
+		}
+		ind++;		//Increment index var
+	}
+}
+
+/**
+ * @brief Writes a number on LCD
+ * @param[in]: xs: Center x coordinate
+ * @param[in]: ys: Center y coordinate
+ * @param[in]: val: val to be written
+ * @param[in]: _color: Color of val
+ * @param[in]: size: Size of val
+ */
+void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _color, const font_size size){
+
+	if (val == 0) {
+    lcd_ShowCh(xs, ys,'0', _color, size);
+    return;
+	}
+
+	//Select font
+	uint8_t var_y;
+	uint8_t *font_type;
+	if( size == SMALL){};
+	if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
+	if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
+
+	long BASE = 100000000;
+	uint8_t ind = 0;
+	while( (val / BASE) == 0 && BASE > 1) BASE /= 10;
+	
+	while( val > 0 && ind < 16 ){
+		uint8_t curr_val = val / BASE;		//Get next MSB digit
+		val -= (curr_val * BASE);			//Subtract
+		BASE /= 10;							//Adjust base
+
+		int offset = (var_y << 1) * (curr_val + '0' - ' ');								//Get correct character
+	
+		//Set window size
+		uint8_t x = xs - (STD_FONT_X_SIZE >> 1) + (STD_FONT_X_SIZE * ind);				//Calc leftmost corner...
+		uint8_t y = ys - (var_y >> 1);							
+		setWindow(x, x + STD_FONT_X_SIZE - 1, y, y + var_y - 1);						//... and set window
+	
+		//Write char
+		for(uint8_t i = 0; i < (var_y << 1); i++){
+			for(int8_t j = 7; j >= 0; j--){
+				//Check each bit of each element. If 0b1 => Write new col, else keep current background color
+				color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
+				lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
+				lcd_wr_data(set_color & 0xFF);  				// Low byte
+			}
+		}
+		ind++;		//Increment index var
+	}
+}
+
+/**
+ * @brief Writes a float number on LCD
+ * @param[in]: xs: Center x coordinate
+ * @param[in]: ys: Center y coordinate
+ * @param[in]: val: float val to be written
+ * @param[in]: decim_pt: Amount of decimals
+ * @param[in]: _color: Color of val
+ * @param[in]: size: Size of val
+ */
+void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, uint8_t decim_pt, const color _color, const font_size size){
+
+	//int decimal_points = 10 * 100000000;
+	//Integral
+	//.
+	//Decimal
+	int integral_val = val;										//Get integral part of val
+	int decimal_val = (val - integral_val) * 100000000;			//Get decimal part of val
+	
+    if (val == 0) {
+    lcd_ShowCh(xs, ys,'0', _color, size);
+    return;
+	}
+
+	//Select font
+	uint8_t var_y;
+	uint8_t *font_type;
+	if( size == SMALL){};
+	if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
+	if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
+
+	long BASE = 100000000;
+	uint8_t ind = 0;
+	while( (integral_val / BASE) == 0 && BASE > 1) BASE /= 10;
+	while( integral_val > 0 && ind < 16 ){
+		uint8_t curr_val = integral_val / BASE;		//Get next MSB digit
+		integral_val -= (curr_val * BASE);			//Subtract
+		BASE /= 10;									//Adjust base
+
+		int offset = (var_y << 1) * (curr_val + '0' - ' ');								//Get correct character
+	
+		//Set window size
+		uint8_t x = xs - (STD_FONT_X_SIZE >> 1) + (STD_FONT_X_SIZE * ind);				//Calc leftmost corner...
+		uint8_t y = ys - (var_y >> 1);							
+		setWindow(x, x + STD_FONT_X_SIZE - 1, y, y + var_y - 1);						//... and set window
+	
+		//Write char
+		for(uint8_t i = 0; i < (var_y << 1); i++){
+			for(int8_t j = 7; j >= 0; j--){
+				//Check each bit of each element. If 0b1 => Write new col, else keep current background color
+				color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
+				lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
+				lcd_wr_data(set_color & 0xFF);  				// Low byte
+			}
+		}
+		ind++;		//Increment index var
+	}
+
+	//Decimal point
+	lcd_ShowCh(xs + (STD_FONT_X_SIZE * ind ), ys, '.', _color, size);
+	ind++;
+
+
+	BASE = 100000000;
+	while( (decimal_val / BASE) == 0 && BASE > 1 ) BASE /= 10;
+	while( decimal_val > 0 && ind < 16 && decim_pt > 0){
+
+		decim_pt--;
+
+		uint8_t curr_val = decimal_val / BASE;		//Get next MSB digit
+		decimal_val -= (curr_val * BASE);			//Subtract
+		BASE /= 10;									//Adjust base
+
+		int offset = (var_y << 1) * (curr_val + '0' - ' ');								//Get correct character
+	
+		//Set window size
+		uint8_t x = xs - (STD_FONT_X_SIZE >> 1) + (STD_FONT_X_SIZE * ind);				//Calc leftmost corner...
+		uint8_t y = ys - (var_y >> 1);							
+		setWindow(x, x + STD_FONT_X_SIZE - 1, y, y + var_y - 1);						//... and set window
+	
+		//Write char
+		for(uint8_t i = 0; i < (var_y << 1); i++){
+			for(int8_t j = 7; j >= 0; j--){
+				//Check each bit of each element. If 0b1 => Write new col, else keep current background color
+				color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
+				lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
+				lcd_wr_data(set_color & 0xFF);  				// Low byte
+			}
+		}
+		ind++;		//Increment index var
+	}
 }
 
 

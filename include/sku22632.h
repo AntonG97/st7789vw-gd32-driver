@@ -2,6 +2,7 @@
 #define SKU22632_H
 
 #include <stdint.h>
+#include "lcd_font.h"
 
 /**
  * x and y coordinates MAX
@@ -93,9 +94,45 @@ void lcd_drawCircle(uint16_t xs, uint16_t ys, uint16_t r, color color);
  * @param[in]: r: radie
  */
 void lcd_drawCircle_filled(uint16_t xs, uint16_t ys, uint16_t r, color color);
-
-void lcd_ShowNum();
-void lcd_showNum_float();
+/**
+ * @brief Writes a character on LCD
+ * @param[in]: xs: Center x coordinate
+ * @param[in]: ys: Center y coordinate
+ * @param[in]: ch: Character that is to be written
+ * @param[in]: _color: Color of Character
+ * @param[in]: size: Size of Character
+ */
+void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, color color, font_size size);
+/**
+ * @brief Writes a string on LCD
+ * @param[in]: xs: Center x coordinate
+ * @param[in]: ys: Center y coordinate
+ * @param[in]: str: String that is to be written
+ * @param[in]: _color: Color of Characters
+ * @param[in]: size: Size of Characters
+ */
+void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const color _color, const font_size size);
+/**
+ * @brief Writes a number on LCD
+ * @param[in]: xs: Center x coordinate
+ * @param[in]: ys: Center y coordinate
+ * @param[in]: val: val to be written
+ * @param[in]: _color: Color of val
+ * @param[in]: size: Size of val
+ */
+void lcd_showNum(const uint16_t xs, const uint16_t ys, const int val, const color _color, const font_size size);
+/**
+ * @brief Writes a float number on LCD
+ * @param[in]: xs: Center x coordinate
+ * @param[in]: ys: Center y coordinate
+ * @param[in]: val: float val to be written
+ * @param[in]: decim_pt: Amount of decimals
+ * @param[in]: _color: Color of val
+ * @param[in]: size: Size of val
+ */
+void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, const uint8_t decim_pt, const color _color, const font_size size);
 void lcd_showPicture();
 void lcd_showLogo();
+
+
 #endif
