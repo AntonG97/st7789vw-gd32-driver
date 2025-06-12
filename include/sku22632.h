@@ -3,6 +3,15 @@
 
 #include <stdint.h>
 
+/**
+ * x and y coordinates MAX
+ */
+#define LCD_X_MAX 240
+#define LCD_Y_MAX 240
+
+/**
+ * Bit patterns for colors
+ */
 typedef enum{
 	RED = 0xF800,
 	BLUE = 0x001F,
@@ -23,23 +32,70 @@ typedef enum{
  */
 void lcd_init(uint32_t _spi_periph, uint32_t _gpio_perpih, uint32_t clk, uint32_t din, uint32_t _rst, uint32_t _cs, uint32_t _dc);
 /**
+ * @brief Clears LCD screen
+ * @param[in]: color: Sets LCD to specified color
+ */
+void lcd_clear(color color);
+/**
  * \brief Queue for LCD. Call first in superloop
  */
 void lcd_queue_flush(void);
 /**
  * @brief Draw single point
- * @param[in] x: col start coordinate [0 <= xs <= 239]
- * @param[in] y: row start coordinate [0 <= ys <= 319]
+ * @param[in] x: col start coordinate [0 <= xs <= 240]
+ * @param[in] y: row start coordinate [0 <= ys <= 240]
+ * @param[in] color: Color to be filled
  */
-void lcd_drawPoint(const uint16_t x, const uint16_t y, color color);
+void lcd_drawPixel(const uint16_t x, const uint16_t y, color color);
+/**
+ * @brief Draw single point big size
+ * @param[in] x: col start coordinate [0 <= xs <= 240]
+ * @param[in] y: row start coordinate [0 <= ys <= 240]
+ * @param[in] color: Color to be filled
+ */
+void lcd_drawPixel_big(const uint16_t x, const uint16_t y, color color);
+/**
+ * @brief Sets a new window
+ * @param[in] xs: col start coordinate 	[0 <= xs <= xe]
+ * @param[in] xe: col end coordinate	[xs <= xe <= 240]
+ * @param[in] ys: row start coordinate 	[0 <= ys <= ye]
+ * @param[in] ye: row end coordinate 	[ys <= ye <= 240]
+ * @param[in] color: Color to be filled
+ */
+void lcd_drawLine(uint16_t xs, const uint16_t xe, uint16_t ys, const uint16_t ye, color color);
 /**
  * @brief Draw rectangle
- * @param[in] xs: col start coordinate [0 <= xs <= xe]
- * @param[in] xe: col end coordinate [xs <= xe <= 239]
- * @param[in] ys: row start coordinate [0 <= ys <= ye]
- * @param[in] ye: row end coordinate [ys <= ye <= 319]
+ * @param[in] xs: col start coordinate 	[0 <= xs <= xe]
+ * @param[in] xe: col end coordinate	[xs <= xe <= 240]
+ * @param[in] ys: row start coordinate 	[0 <= ys <= ye]
+ * @param[in] ye: row end coordinate 	[ys <= ye <= 240]
  */
 void lcd_drawRec(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color);
+/**
+ * @brief Draw filled rectangle
+ * @param[in] xs: col start coordinate 	[0 <= xs <= xe]
+ * @param[in] xe: col end coordinate	[xs <= xe <= 240]
+ * @param[in] ys: row start coordinate 	[0 <= ys <= ye]
+ * @param[in] ye: row end coordinate 	[ys <= ye <= 240]
+ */
+void lcd_drawRec_filled(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color);
+/**
+ * @brief Draw circle
+ * @param[in]: xs: center x coordinate 
+ * @param[in]: ys: center y coordinate 
+ * @param[in]: r: radie
+ */
+void lcd_drawCircle(uint16_t xs, uint16_t ys, uint16_t r, color color);
+/**
+ * @brief Draw filled circle
+ * @param[in]: xs: center x coordinate 
+ * @param[in]: ys: center y coordinate 
+ * @param[in]: r: radie
+ */
+void lcd_drawCircle_filled(uint16_t xs, uint16_t ys, uint16_t r, color color);
 
-
+void lcd_ShowNum();
+void lcd_showNum_float();
+void lcd_showPicture();
+void lcd_showLogo();
 #endif

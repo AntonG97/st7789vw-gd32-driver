@@ -26,13 +26,14 @@ typedef enum{
 	WRDISBV = 0x51,	//Write display brightness + 1 byte (0x00 => Lowest 0xFF => Highest)
 }cmd;
 
-
 static void lcd_wr_data(const uint8_t data);
 static void lcd_wr_cmd(const cmd data);
-static void delay_ms(uint8_t ms);
 static void lcd_queue_flush_blocking(void);
 static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye);
 static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color);
+
+//Auxillery functions
+static void delay_ms(uint8_t ms);
 
 /**
  * SPI base
@@ -63,35 +64,69 @@ static uint32_t dc;
 
 int main(void){
 
-	
-	//DBG
-	rcu_periph_clock_enable(RCU_GPIOB);
-	gpio_init(GPIOB, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_9);
-	gpio_bit_reset(GPIOB, GPIO_PIN_9);
 	lcd_init(SPI0, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
-	gpio_bit_set(GPIOB, GPIO_PIN_9);
 
+	//DBG
+	//setWindow(50, 150, 50, 150);
+	//fillWindow(50, 150, 50, 150, BLUE);
+	//setWindow(100, 150, 100, 150);
+	//fillWindow(100, 150, 100, 150, RED);
+
+	//lcd_drawLine(1,100,1,100, RED);
+
+	/*
+	lcd_drawRec(0,120,0,50,GREEN);
+	//lcd_drawRec(0,280,230,280,RED);
+
+	lcd_drawLine(120,120,100,140, BLACK);
+	lcd_drawLine(100,140,120,120, BLACK);
+	lcd_drawLine(0,240,0,240, BLACK);
+	lcd_drawLine(0,240,240,0, BLACK);
+
+	lcd_drawCircle(190,190, 30, BLACK);
+	lcd_drawCircle_filled(100,100,20, RED);
+	lcd_clear(RED);
+	lcd_drawPixel_big(120,120,GREEN);
+	*/
+
+	lcd_drawLine(0, 240, 120, 120, BLACK);
+
+	
+	
+	int max_y = LCD_Y_MAX - 90;
 	int x = 0;
-	int y = 0;
+	int y = 120;
+	int up = 1;
+
 	while(1){
 		lcd_queue_flush();
-		x = (x+1) % 240;
-		if( x == 0 ) y = (y+1) % 240;
-		//y = (y+1) % 240;
+		lcd_clear(RED);
+		lcd_clear(WHITE);
+		lcd_clear(GREEN);
 
-		lcd_drawPoint(x,y,GREEN);
+		/*
+		lcd_drawPixel_big(x,y,RED);
 
-		//gpio_bit_set(GPIOB, GPIO_PIN_9);
-		//delay_ms(1);
-		//gpio_bit_reset(GPIOB, GPIO_PIN_9);
-		//delay_ms(1);
+		x = (x + 1) % LCD_X_MAX;
+		//y = ( y + 1) % LCD_Y_MAX;
+		
+		if( y == max_y ) up = 0;
+		if( y == max_y - 120 ) up = 1;
+		//Climb y upper
+		if( y >= 120 && y < max_y && up ){
+			y++;
+		}else{
+			y--;
+		}
+		//Reached upper, go down
+		//Reached down, go upp
+		
+		*/
 	}
-
 
 	return 0;
 }
 	
-
 /**
  * @brief initialises LCD. OBS
  * \param[in]: spi_periph: SPIx(x=0,1,2)
@@ -103,13 +138,6 @@ int main(void){
  * \param[in]: dc: Data or cmd => GPIO_PIN_x(x=0..15)
  */
 void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32_t _din, uint32_t _rst, uint32_t _cs, uint32_t _dc){
-
-	//DBG
-	//rcu_periph_clock_enable(RCU_GPIOB);
-	//gpio_init(GPIOB, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_9);
-	//gpio_bit_set(GPIOB, GPIO_PIN_9);
-
-
 	spi_perpih = _spi_perpih;
 	gpio_perpih = _gpio_perpih;
 	rst = _rst;
@@ -131,9 +159,6 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 		case SPI1: rcu_periph_clock_enable(RCU_SPI1); break;
 		case SPI2: rcu_periph_clock_enable(RCU_SPI2); break;
 	}
-	
-	//rcu_periph_clock_enable(RCU_AF); // Lägg till detta innan du initierar GPIO!
-	//rcu_periph_clock_enable(RCU_GPIOA);
 
 	/**
 	 * Init GPIO
@@ -152,7 +177,6 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	gpio_init(gpio_perpih, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, dc);
 	//gpio_bit_set(gpio_perpih, dc);
 
-	
 	/**
 	 * Init SPI As Master, 8 bit frame size, little endian and f = 27MHz
 	 */
@@ -175,7 +199,6 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	 */
 	spi_enable(spi_perpih);
 
-	
 	//HW reset (Reset low for 10-20ms)
 	gpio_bit_reset(gpio_perpih, rst);
 	delay_ms(40);
@@ -186,7 +209,7 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	lcd_queue_flush_blocking();
 	delay_ms(130);
 
-	//Sleep out?
+	//Sleep out
 	lcd_wr_cmd(SLPOUT);
 	lcd_queue_flush_blocking();
 	delay_ms(130);
@@ -194,37 +217,28 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	//Pixel format (0x3A + data(0x55) RGB16bit)
 	lcd_wr_cmd(COLMOD);
 	lcd_wr_data(0x55);
-	//lcd_queue_flush_blocking();
 
 	lcd_wr_cmd(INVON);
 
-	//MADCTL (cmd 0x36 + data)
 	lcd_wr_cmd(MADCTL);
-	lcd_wr_data(0x00);
-	//lcd_queue_flush_blocking();
+	lcd_wr_data(0xA0);
 
-	//Set col(cmd 0x2A + 4 bytes) & adr (cmd 0x2B + 4 bytes) range
-	setWindow(0, 239, 0, 239);
-
-	//lcd_queue_flush_blocking();
-
-	lcd_wr_cmd(DISPON);
-
-	fillWindow(0, 240, 0, 240, WHITE);
+	lcd_drawRec_filled(0,240,0,240, WHITE); //LCD screen white
 	
-	lcd_queue_flush_blocking();
-
-	//DBG
-	lcd_drawPoint(50,50,BLUE);
-	lcd_queue_flush_blocking();
-	setWindow(50, 150, 50, 150);
-	fillWindow(50, 150, 50, 150, BLUE);
-	lcd_queue_flush_blocking();
-	setWindow(100, 150, 100, 150);
-	fillWindow(100, 150, 100, 150, RED);
+	lcd_wr_cmd(DISPON);
 	lcd_queue_flush_blocking();
 }
 
+void lcd_clear(color color){
+	setWindow(0, LCD_X_MAX, 0, LCD_Y_MAX);
+	for(int i = 0; i < LCD_X_MAX * LCD_Y_MAX; i++){
+	 	lcd_wr_data(((uint16_t)color >> 8) & 0xFF);  	// High byte
+		lcd_wr_data((uint16_t)color & 0xFF);  			// Low byte
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//SPI functions begin
 static inline void dc_set(void) {
     gpio_bit_set(gpio_perpih, dc);
 }
@@ -240,9 +254,6 @@ static inline void cs_set(void) {
 static inline void cs_clr(void) {
     gpio_bit_reset(gpio_perpih, cs);
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//SPI functions begin
 #define BUFF_SIZE 512
 /**
  * Struct for SPI data
@@ -356,18 +367,20 @@ static void lcd_wr_data(const uint8_t data){
  * @param[in] ye: row end coordinate [ys <= ye <= 319]
  */
 static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye){
-
+	//Add offset to get correct window Size
+	uint8_t X_OFFSET = 80;
+	uint8_t Y_OFFSET = 0;
 	lcd_wr_cmd(CASET);
-	lcd_wr_data( xs >> 8 & 0xFF );
-	lcd_wr_data( xs & 0xFF);
-	lcd_wr_data( xe >> 8 & 0xFF );
-	lcd_wr_data( xe & 0xFF );
+	lcd_wr_data(((xs + X_OFFSET) >> 8 ) & 0xFF);
+	lcd_wr_data((xs + X_OFFSET) & 0xFF);
+	lcd_wr_data(((xe + X_OFFSET) >> 8) & 0xFF);
+	lcd_wr_data((xe + X_OFFSET) & 0xFF);
 
 	lcd_wr_cmd(RASET);
-	lcd_wr_data( ys >> 8 & 0xFF );
-	lcd_wr_data( ys & 0xFF);
-	lcd_wr_data( ye >> 8 & 0xFF );
-	lcd_wr_data( ye & 0xFF );
+	lcd_wr_data(((ys + Y_OFFSET) >> 8) & 0xFF);
+	lcd_wr_data((ys + Y_OFFSET) & 0xFF);
+	lcd_wr_data(((ye + Y_OFFSET) >> 8) & 0xFF);
+	lcd_wr_data((ye + Y_OFFSET) & 0xFF);
 	//RAMWR
 	lcd_wr_cmd(RAMWR);
 }
@@ -378,11 +391,14 @@ static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, c
  * @param[in] xe: col end coordinate [xs <= xe <= 239]
  * @param[in] ys: row start coordinate [0 <= ys <= ye]
  * @param[in] ye: row end coordinate [ys <= ye <= 319]
+ * @param[in] color: Color to be filled
  */
-static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color){
-	lcd_wr_cmd(RAMWR);       // RAMWR (start writing to RAM)
-	uint16_t dx = xe - xs, dy = ye - ys;
-	for (int i = 0; i < xe*ye; i++) {
+static void fillWindow(const uint16_t xs, uint16_t xe, const uint16_t ys, uint16_t ye, color color){
+	lcd_wr_cmd(RAMWR);       							// RAMWR (start writing to RAM)
+	(xe = (xe > 240 ? 240 : xe));						//Make sure end coordinates is within range
+	(ye = (ye > 240 ? 240 : ye));
+	uint16_t dx = xe - xs + 1, dy = ye - ys + 1;
+	for (int i = 0; i < dx*dy; i++) {
 		lcd_wr_data(((uint16_t)color >> 8) & 0xFF);  	// High byte
 		lcd_wr_data((uint16_t)color & 0xFF);  			// Low byte
 	}
@@ -390,47 +406,173 @@ static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, 
 
 /**
  * @brief Draw single point
- * @param[in] x: col start coordinate [0 <= xs <= 239]
- * @param[in] y: row start coordinate [0 <= ys <= 319]
+ * @param[in] x: col start coordinate [0 <= xs <= 240]
+ * @param[in] y: row start coordinate [0 <= ys <= 240]
+ * @param[in] color: Color to be filled
  */
-void lcd_drawPoint(const uint16_t x, const uint16_t y, color color){
+void lcd_drawPixel(const uint16_t x, const uint16_t y, color color){
 	setWindow(x, x, y, y);
 	lcd_wr_data(((uint16_t)color >> 8) & 0xFF);
 	lcd_wr_data((uint16_t)color & 0xFF);
 }
 
-void lcd_drawLine(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color){
-	setWindow(xs,xe,ys,ye);
-	uint16_t dx = xe - xs, dy = ye - ys;
-
-	
-
-	x = (x+1) % 240;
-	//y = (y+1) % 240;
-
-
-			lcd_wr_data(((uint16_t)color >> 8) & 0xFF);
-			lcd_wr_data((uint16_t)color & 0xFF);
+/**
+ * @brief Draw single point big size
+ * @param[in] x: col start coordinate [0 <= xs <= 240]
+ * @param[in] y: row start coordinate [0 <= ys <= 240]
+ * @param[in] color: Color to be filled
+ */
+void lcd_drawPixel_big(const uint16_t x, const uint16_t y, color color){
+	lcd_drawCircle_filled(x,y,2,color);
 }
 
-void lcd_drawCircle(){
-	return;
+/**
+ * @brief Sets a new window
+ * @param[in] xs: col start coordinate 	[0 <= xs <= xe]
+ * @param[in] xe: col end coordinate	[xs <= xe <= 240]
+ * @param[in] ys: row start coordinate 	[0 <= ys <= ye]
+ * @param[in] ye: row end coordinate 	[ys <= ye <= 240]
+ */
+void lcd_drawLine(uint16_t xs, uint16_t xe, uint16_t ys, uint16_t ye, color color){
+		// Specialfall: vertikal linje
+	 if (xs == xe) {						//Vertical line
+		 if (ys > ye) { uint16_t tmp = ys; ys = ye; ye = tmp; }
+		 setWindow(xs, xs, ys, ye);
+		 for (uint16_t y = ys; y <= ye; y++) {
+			lcd_wr_data(color >> 8);
+			lcd_wr_data(color & 0xFF);
+		}
+		return;
+	}
+
+	// Specialfall: horisontell linje
+	if (ys == ye) {							//Horizontal line
+		if (xs > xe) { uint16_t tmp = xs; xs = xe; xe = tmp; }
+		setWindow(xs, xe, ys, ys);
+		for (uint16_t x = xs; x <= xe; x++) {
+			lcd_wr_data(color >> 8);
+			lcd_wr_data(color & 0xFF);
+		}
+		return;
+	}
+
+	//Bresenham's linjealgoritm. Given by ChatGPT
+	int16_t dx = (xe > xs ? xe - xs : xs - xe);	//Abs val
+	int16_t dy = -(ye > ys ? ye - ys : ys - ye);//(-)Abs val
+	int16_t sx = (xs < xe) ? 1 : -1;			//Direction of x
+	int16_t sy = (ys < ye) ? 1 : -1;			//Direction of y
+	int16_t err = dx + dy;						//Error term
+
+	while (1) {
+		lcd_drawPixel(xs, ys, color);			//Draw pixel
+		if (xs == xe && ys == ye) break;		//If both coordinates start = end pos then break
+		int16_t e2 = err << 1;					//err * 2
+		if (e2 >= dy) {							
+			err += dy;
+			xs += sx;
+		}
+		if (e2 <= dx) {
+			err += dx;
+			ys += sy;
+		}
+	}
 }
+
 /**
  * @brief Draw rectangle
- * @param[in] xs: col start coordinate [0 <= xs <= xe]
- * @param[in] xe: col end coordinate [xs <= xe <= 239]
- * @param[in] ys: row start coordinate [0 <= ys <= ye]
- * @param[in] ye: row end coordinate [ys <= ye <= 319]
+ * @param[in] xs: col start coordinate 	[0 <= xs <= xe]
+ * @param[in] xe: col end coordinate	[xs <= xe <= 240]
+ * @param[in] ys: row start coordinate 	[0 <= ys <= ye]
+ * @param[in] ye: row end coordinate 	[ys <= ye <= 240]
  */
 void lcd_drawRec(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color){
+	lcd_drawLine(xs, xe, ys, ys, color);		//Upper horiz
+	lcd_drawLine(xs, xe, ye, ye, color);		//Lower horiz
+	lcd_drawLine(xs, xs, ys, ye, color);		//Lower vert
+	lcd_drawLine(xe, xe, ys, ye, color);		//Upper vert
+}
+
+/**
+ * @brief Draw rectangle
+ * @param[in] xs: col start coordinate 	[0 <= xs <= xe]
+ * @param[in] xe: col end coordinate	[xs <= xe <= 240]
+ * @param[in] ys: row start coordinate 	[0 <= ys <= ye]
+ * @param[in] ye: row end coordinate 	[ys <= ye <= 240]
+ */
+void lcd_drawRec_filled(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color){
 	setWindow(xs,xe,ys,ye);
 	fillWindow(xs,xe,ys,ye, color);
 }
 
+/**
+ * @brief Draw circle
+ * @param[in]: xs: center x coordinate 
+ * @param[in]: ys: center y coordinate 
+ * @param[in]: r: radie
+ */
+void lcd_drawCircle(uint16_t xs, uint16_t ys, uint16_t r, color color){
+
+	//Algoritm to draw circle based on Midpoint circle. Given by ChatGPT
+	int16_t x = 0;
+    int16_t y = r;
+    int16_t d = 1 - r; 
+
+    while (x <= y) {
+        //Draw symmetric points in all eight octants
+        lcd_drawPixel(xs + x, ys + y, color);
+        lcd_drawPixel(xs - x, ys + y, color);
+        lcd_drawPixel(xs + x, ys - y, color);
+        lcd_drawPixel(xs - x, ys - y, color);
+        lcd_drawPixel(xs + y, ys + x, color);
+        lcd_drawPixel(xs - y, ys + x, color);
+        lcd_drawPixel(xs + y, ys - x, color);
+        lcd_drawPixel(xs - y, ys - x, color);
+
+        if (d < 0) {
+            d += 2 * x + 3;
+        } else {
+            d += 2 * (x - y) + 5;
+            y--;
+        }
+        x++;
+    }
+}
+
+/**
+ * @brief Draw filled circle
+ * @param[in]: xs: center x coordinate 
+ * @param[in]: ys: center y coordinate 
+ * @param[in]: r: radie
+ */
+void lcd_drawCircle_filled(uint16_t xs, uint16_t ys, uint16_t r, color color){
+    int16_t x = 0;
+    int16_t y = r;
+    int16_t d = 1 - r;
+
+    while (y >= x) {
+        // Ritar horisontella linjer mellan symmetriska punkter i alla oktanter
+
+        lcd_drawLine(xs - x, xs + x, ys - y, ys - y, color); // Övre horisontella linje
+        lcd_drawLine(xs - x, xs + x, ys + y, ys + y, color); // Nedre horisontella linje
+        lcd_drawLine(xs - y, xs + y, ys - x, ys - x, color); // Övre horisontella linje (andra oktanter)
+        lcd_drawLine(xs - y, xs + y, ys + x, ys + x, color); // Nedre horisontella linje (andra oktanter)
+
+        x++;
+
+        if (d < 0) {
+            d += (x << 1) + 1;
+        } else {
+            y--;
+            d += ((x - y) << 1)+ 1;
+        }
+    }
+}
+
+
 
 //LCD functions ends
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//Extras 
 /**
  * @brief Delays (blocking)
  * @param[in] ms: Amount of ms to delay
