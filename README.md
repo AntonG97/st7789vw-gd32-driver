@@ -7,6 +7,11 @@ The user can freely configure which SPI peripheral and GPIO pins are used for co
 ![image](https://github.com/user-attachments/assets/1bd5ee32-b214-4a39-9df6-e109f845d37e)
 
 
+## User options
+Change resolution on LCD by chaning the following constants in sku22632.h header file
+![image](https://github.com/user-attachments/assets/2e9fd384-8f7a-4733-ad70-e98ed928888c)
+
+
 ## 📌 Features
 
 - Supports 1-bit monochrome bitmaps (240x240)
