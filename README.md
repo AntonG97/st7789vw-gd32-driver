@@ -40,7 +40,6 @@ Below is a description of the LCD pinout for the SKU22632 1.3" 240x240 IPS displ
 | `VCC`   | Power        | Supply voltage. Accepts 3.3V or 5V.                        | ❌ No          |
 | `GND`   | Ground       | Ground connection.                                         | ❌ No          |
 
-> 💡 **Note:** All signal pins (`RST`, `DC`, `CS`, `CLK`, `DIN`) are **fully configurable** in `config.h`.  
-> You can select which GPIO and SPI peripheral to use depending on your hardware setup.
+> 💡 **Note:** All signal pins (`RST`, `DC`, `CS`, `CLK`, `DIN`) are **selectable** when initializing lcd. Please make sure that choosen SPI pheripheral and SPI pins (CLK & DIN) are correctly selected
 
 
