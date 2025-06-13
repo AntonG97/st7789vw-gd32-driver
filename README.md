@@ -31,7 +31,7 @@ Below is a description of the LCD pinout for the SKU22632 1.3" 240x240 IPS displ
 
 | LCD Pin | Name         | Function                                                  | Configurable? |
 |---------|--------------|-----------------------------------------------------------|----------------|
-| `BL`    | Backlight    | LCD backlight. Connect to 3.3V or control via GPIO.       | Optional       |
+| `BL`    | Backlight    | LCD backlight. Connect to 3.3V or control via GPIO.       | ❌ No       |
 | `RST`   | Reset        | **Active Low**. Resets the LCD controller.               | ✅ Yes         |
 | `DC`    | Data/Command | **High = Data**, **Low = Command** mode selector.         | ✅ Yes         |
 | `CS`    | Chip Select  | **Active Low**. Enables SPI communication with the LCD.   | ✅ Yes         |
