@@ -86,23 +86,10 @@ int main(void){
 	*/
 	lcd_showPicture(kub_map_v4);
 
-	const color color_list[] = {
-    WHITE, BLACK, RED, GREEN, BLUE,
-    YELLOW, CYAN, MAGENTA, BROWN, BRRED,
-    GRAY, DARKBLUE, LIGHTBLUE, GRAYBLUE,
-    LIGHTGREEN, LGRAY, DGRAY, LGRAYBLUE,
-    LBBLUE, BRED, GRED, GBLUE
-	};
-
-	const int color_count = sizeof(color_list) / sizeof(color_list[0]);
-
-	
 	while(1){
 		lcd_queue_flush();
-		for (int i = 0; i < color_count; i++) {
-		lcd_clear(color_list[i]);
-		delay_ms(500);
-		}
+
+	
 	}
 	return 0;
 }
