@@ -9,6 +9,7 @@ The user can freely configure which SPI peripheral and GPIO pins are used for co
 
 ## User options
 Change resolution on LCD by chaning the following constants in sku22632.h header file
+
 ![image](https://github.com/user-attachments/assets/2e9fd384-8f7a-4733-ad70-e98ed928888c)
 
 
