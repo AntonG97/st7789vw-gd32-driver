@@ -34,7 +34,7 @@ typedef enum{
 void lcd_init(uint32_t _spi_periph, uint32_t _gpio_perpih, uint32_t clk, uint32_t din, uint32_t _rst, uint32_t _cs, uint32_t _dc);
 /**
  * @brief Clears LCD screen
- * @param[in]: color: Sets LCD to specified color
+ * @param[in]: color: Specifies the color of the screen to be cleared to
  */
 void lcd_clear(color color);
 /**
@@ -131,8 +131,11 @@ void lcd_showNum(const uint16_t xs, const uint16_t ys, const int val, const colo
  * @param[in]: size: Size of val
  */
 void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, const uint8_t decim_pt, const color _color, const font_size size);
-void lcd_showPicture();
-void lcd_showLogo();
-
+/**
+ * @brief Draws picture on LCD.
+ * @param[in]: bitMap: Pointer to bitmap of 240x240 / 8 bytes
+ */
+void lcd_showPicture(uint8_t *bitMap);
+//void lcd_showLogo();
 
 #endif

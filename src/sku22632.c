@@ -72,6 +72,7 @@ int main(void){
 
 	lcd_init(SPI0, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
 
+	/*
 	lcd_drawLine(0, 240, 120, 120, BLACK);
 
 	lcd_ShowCh(20,20,'2', RED, BIG);
@@ -79,26 +80,62 @@ int main(void){
 
 	lcd_showStr(8,100, "Hello World!!!!!!!!!!",RED, BIG);
 
-	
 	lcd_showNum(20, 200, 0, GREEN, SMALL);
 	
 	lcd_showNum_float(50,200, 222.99, 2, RED, BIG);
+	*/
+	lcd_showPicture(kub_map_v4);
 	
 	//lcd_ShowCh(60,20,'A', RED);
-	uint8_t x = 0;
+	//uint8_t x = 0;
 	while(1){
 		lcd_queue_flush();
 		
-		lcd_drawRec_filled(10,30, 140, 180, WHITE);
-		lcd_showNum(20, 160, x++, RED, BIG);
-		x = (x % 255);
+		//lcd_drawRec_filled(10,30, 140, 180, WHITE);
+		//lcd_showNum(20, 160, x++, RED, BIG);
+		//x = (x % 255);
 
 
 	}
-
 	return 0;
 }
-	
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//SPI functions begin
+static inline void dc_set(void) {
+    gpio_bit_set(gpio_perpih, dc);
+}
+
+static inline void dc_clr(void) {
+    gpio_bit_reset(gpio_perpih, dc);
+}
+
+static inline void cs_set(void) {
+    gpio_bit_set(gpio_perpih, cs);
+}
+
+static inline void cs_clr(void) {
+    gpio_bit_reset(gpio_perpih, cs);
+}
+#define BUFF_SIZE 512
+/**
+ * Struct for SPI data
+ * @param type: Kind of data. 0 = cmd and 1 = data
+ * @param data: Data to be sent
+ */
+typedef struct{
+	//0 = cmd, 1 = data
+	uint8_t type;
+	uint8_t data;
+}spi_data;
+
+/*
+ * Spi data buffer
+ */
+spi_data buff[BUFF_SIZE] = {0};
+int tail = 0, head = 0;
+
+
 /**
  * @brief initialises LCD. OBS
  * \param[in]: spi_periph: SPIx(x=0,1,2)
@@ -202,6 +239,10 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	lcd_queue_flush_blocking();
 }
 
+/**
+ * @brief Clears LCD screen
+ * @param[in]: color: Specifies the color of the screen to be cleared to
+ */
 void lcd_clear(color color){
 	setWindow(0, LCD_X_MAX, 0, LCD_Y_MAX);
 	for(int i = 0; i < LCD_X_MAX * LCD_Y_MAX; i++){
@@ -210,41 +251,6 @@ void lcd_clear(color color){
 	}
 	curr_backgr = color;
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//SPI functions begin
-static inline void dc_set(void) {
-    gpio_bit_set(gpio_perpih, dc);
-}
-
-static inline void dc_clr(void) {
-    gpio_bit_reset(gpio_perpih, dc);
-}
-
-static inline void cs_set(void) {
-    gpio_bit_set(gpio_perpih, cs);
-}
-
-static inline void cs_clr(void) {
-    gpio_bit_reset(gpio_perpih, cs);
-}
-#define BUFF_SIZE 512
-/**
- * Struct for SPI data
- * @param type: Kind of data. 0 = cmd and 1 = data
- * @param data: Data to be sent
- */
-typedef struct{
-	//0 = cmd, 1 = data
-	uint8_t type;
-	uint8_t data;
-}spi_data;
-
-/*
- * Spi data buffer
- */
-spi_data buff[BUFF_SIZE] = {0};
-int tail = 0, head = 0;
 
 /**
  * \brief Queue for LCD. Call first in superloop
@@ -757,11 +763,33 @@ void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, ui
 	}
 }
 
+/**
+ * @brief Draws picture on LCD.
+ * @param[in]: bitMap: Pointer to bitmap of 240x240 / 8 bytes
+ */
+void lcd_showPicture(uint8_t *bitMap){
+    setWindow(0, LCD_X_MAX - 1, 0, LCD_Y_MAX - 1);  
 
+    for (uint16_t y = 0; y < LCD_Y_MAX; y++) {
+        for (uint16_t x = 0; x < LCD_X_MAX; x++) {
+            uint32_t pixelIndex = y * LCD_X_MAX + x;	//Pixel index
+            uint32_t byteIndex = pixelIndex / 8;		//Byte index
+            uint8_t bitIndex = 7 - (pixelIndex % 8);  	//MSB first
+
+            uint8_t byte = bitMap[byteIndex];		
+            uint8_t bit = (byte >> bitIndex) & 0x01;	
+
+            color set_color = (bit == 1) ? BLACK : WHITE;
+
+            lcd_wr_data((set_color >> 8) & 0xFF);  		// High byte
+            lcd_wr_data(set_color & 0xFF);         		// Low byte
+        }
+    }
+}
 
 //LCD functions ends
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Extras 
+//Auxillary
 /**
  * @brief Delays (blocking)
  * @param[in] ms: Amount of ms to delay
