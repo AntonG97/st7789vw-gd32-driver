@@ -85,17 +85,24 @@ int main(void){
 	lcd_showNum_float(50,200, 222.99, 2, RED, BIG);
 	*/
 	lcd_showPicture(kub_map_v4);
+
+	const color color_list[] = {
+    WHITE, BLACK, RED, GREEN, BLUE,
+    YELLOW, CYAN, MAGENTA, BROWN, BRRED,
+    GRAY, DARKBLUE, LIGHTBLUE, GRAYBLUE,
+    LIGHTGREEN, LGRAY, DGRAY, LGRAYBLUE,
+    LBBLUE, BRED, GRED, GBLUE
+	};
+
+	const int color_count = sizeof(color_list) / sizeof(color_list[0]);
+
 	
-	//lcd_ShowCh(60,20,'A', RED);
-	//uint8_t x = 0;
 	while(1){
 		lcd_queue_flush();
-		
-		//lcd_drawRec_filled(10,30, 140, 180, WHITE);
-		//lcd_showNum(20, 160, x++, RED, BIG);
-		//x = (x % 255);
-
-
+		for (int i = 0; i < color_count; i++) {
+		lcd_clear(color_list[i]);
+		delay_ms(500);
+		}
 	}
 	return 0;
 }
@@ -348,8 +355,13 @@ static void lcd_wr_data(const uint8_t data){
  */
 static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye){
 	//Add offset to get correct window Size
-	uint8_t X_OFFSET = 80;
+	uint8_t X_OFFSET = 0;
 	uint8_t Y_OFFSET = 0;
+	if( LCD_X_MAX == 240 && LCD_Y_MAX == 240 ){
+		X_OFFSET = 80;
+		Y_OFFSET = 0;
+	}
+
 	lcd_wr_cmd(CASET);
 	lcd_wr_data(((xs + X_OFFSET) >> 8 ) & 0xFF);
 	lcd_wr_data((xs + X_OFFSET) & 0xFF);
@@ -375,8 +387,8 @@ static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, c
  */
 static void fillWindow(const uint16_t xs, uint16_t xe, const uint16_t ys, uint16_t ye, color color){
 	lcd_wr_cmd(RAMWR);       							// RAMWR (start writing to RAM)
-	(xe = (xe > 240 ? 240 : xe));						//Make sure end coordinates is within range
-	(ye = (ye > 240 ? 240 : ye));
+	(xe = (xe > 240 ? LCD_X_MAX : xe));					//Make sure end coordinates is within range
+	(ye = (ye > 240 ? LCD_Y_MAX : ye));
 	uint16_t dx = xe - xs + 1, dy = ye - ys + 1;
 	for (int i = 0; i < dx*dy; i++) {
 		lcd_wr_data(((uint16_t)color >> 8) & 0xFF);  	// High byte

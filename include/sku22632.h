@@ -5,21 +5,39 @@
 #include "lcd_font.h"
 
 /**
- * x and y coordinates MAX
+ * x and y coordinates MAX. Change depending on needs
  */
 #define LCD_X_MAX 240
 #define LCD_Y_MAX 240
 
 /**
- * Bit patterns for colors
+ * Bit patterns for RGB565 colors (5 bits red, 6 bits green, 5 bits blue)
  */
-typedef enum{
-	RED = 0xF800,
-	BLUE = 0x001F,
-	GREEN = 0x07E0,
-	WHITE = 0xFFFF,
-	BLACK = 0x0000
+typedef enum {
+    WHITE        = 0xFFFF,
+    BLACK        = 0x0000,
+    RED          = 0xF800,
+    GREEN        = 0x07E0,
+    BLUE         = 0x001F,
+    YELLOW       = 0xFFE0,
+    CYAN         = 0x7FFF,
+    MAGENTA      = 0xF81F,
+    BROWN        = 0xBC40,
+    BRRED        = 0xFC07,
+    GRAY         = 0x8430,
+    DARKBLUE     = 0x01CF,
+    LIGHTBLUE    = 0x7D7C,
+    GRAYBLUE     = 0x5458,
+    LIGHTGREEN   = 0x841F,
+    LGRAY        = 0xC618,
+    DGRAY        = 0x31A6,
+    LGRAYBLUE    = 0xA651,
+    LBBLUE       = 0x2B12,
+    BRED         = 0xF81F,
+    GRED         = 0xFFE0,
+    GBLUE        = 0x07FF
 }color;
+
 
 /**
  * @brief initialises LCD. OBS
