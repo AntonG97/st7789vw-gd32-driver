@@ -41,15 +41,17 @@ typedef enum {
 
 /**
  * @brief initialises LCD. OBS
- * \param[in]: spi_periph: SPIx(x=0,1,2)
- * \param[in]: gpio_periph: GPIOx(x = A,B,C,D,E). OBS! Once chosen, base all GPIO pins on input param!
- * \param[in]: clk: SPI clock pin
- * \param[in]: din: SPI data out (MOSI)
- * \param[in]: rst: Reset => GPIO_PIN_x(x=0..15) 
- * \param[in]: cs: Chip select => GPIO_PIN_x(x=0..15)
- * \param[in]: dc: Data or cmd => GPIO_PIN_x(x=0..15)
+ * @param[in]: spi_periph: SPIx(x=0,1,2)
+ * @param[in]: _dma_periph: DMAx(x=0,1)
+ * @param[in]: _channel: specify which DMA channel is initialized only one parameter can be selected => DMA0: DMA_CHx(x=0..6), DMA1: DMA_CHx(x=0..4)
+ * @param[in]: gpio_periph: GPIOx(x = A,B,C,D,E). OBS! Once chosen, base all GPIO pins on input param!
+ * @param[in]: clk: SPI clock pin
+ * @param[in]: din: SPI data out (MOSI)
+ * @param[in]: rst: Reset => GPIO_PIN_x(x=0..15) 
+ * @param[in]: cs: Chip select => GPIO_PIN_x(x=0..15)
+ * @param[in]: dc: Data or cmd => GPIO_PIN_x(x=0..15)
  */
-void lcd_init(uint32_t _spi_periph, uint32_t _gpio_perpih, uint32_t clk, uint32_t din, uint32_t _rst, uint32_t _cs, uint32_t _dc);
+void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _gpio_perpih, uint32_t _clk, uint32_t _din, uint32_t _rst, uint32_t _cs, uint32_t _dc);
 /**
  * @brief Clears LCD screen
  * @param[in]: color: Specifies the color of the screen to be cleared to
@@ -155,5 +157,10 @@ void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, co
  */
 void lcd_showPicture(uint8_t *bitMap);
 //void lcd_showLogo();
+
+
+
+
+void lcd_dma_clear(color color);
 
 #endif

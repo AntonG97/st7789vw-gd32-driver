@@ -27,6 +27,9 @@ typedef enum{
 	WRDISBV = 0x51,	//Write display brightness + 1 byte (0x00 => Lowest 0xFF => Highest)
 }cmd;
 
+static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _spi_perpih);
+static void dma_prep(uint32_t number);
+
 static void lcd_wr_data(const uint8_t data);
 static void lcd_wr_cmd(const cmd data);
 static void lcd_queue_flush_blocking(void);
@@ -40,6 +43,14 @@ static void delay_ms(uint8_t ms);
  * SPI base
  */
 static uint32_t spi_perpih;
+/**
+ * DMA base
+ */
+static uint32_t dma_periph;
+/**
+ * DMA channel
+ */
+static dma_channel_enum dma_channel;
 
 /**
  * GPIO base
@@ -70,29 +81,102 @@ static color curr_backgr;
 
 int main(void){
 
-	lcd_init(SPI0, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
+	lcd_init(SPI0, DMA0, DMA_CH2, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
+	//lcd_showPicture(kub_map_v4);
 
-	/*
-	lcd_drawLine(0, 240, 120, 120, BLACK);
-
-	lcd_ShowCh(20,20,'2', RED, BIG);
-	lcd_ShowCh(40,20,'2', RED, SMALL);
-
-	lcd_showStr(8,100, "Hello World!!!!!!!!!!",RED, BIG);
-
-	lcd_showNum(20, 200, 0, GREEN, SMALL);
-	
-	lcd_showNum_float(50,200, 222.99, 2, RED, BIG);
-	*/
-	lcd_showPicture(kub_map_v4);
-
+	lcd_dma_clear(RED);
 	while(1){
-		lcd_queue_flush();
+		//lcd_queue_flush();
 
 	
 	}
 	return 0;
 }
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//DMA functions begin 
+
+/**
+ * LCD data buffer. Fill with pixel value and let DMA transmit to SPI
+ * FIX: buffer size
+ */
+static uint16_t dma_buffer_color;
+
+/**
+ * @brief Initialises DMA pherip and channel used by LCD
+ * @param[in]: _dma_periph: DMAx(x=0,1)
+ * @param[in]: _channel: specify which DMA channel is initialized only one parameter can be selected => 
+ * 				DMA0: DMA_CHx(x=0..6), DMA1: DMA_CHx(x=0..4)
+ * @param[in]: _spi_periph: SPIx(x=0,1,2).
+ */
+static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _spi_perpih){
+	
+	rcu_periph_clock_enable(RCU_DMA0);
+
+	dma_periph = _dma_periph;
+	dma_channel = _channel;
+	dma_channel_disable(dma_periph, dma_channel);
+
+
+	/**
+	 * Initilise dma parameters
+	 */
+	dma_parameter_struct dma_init_struct;
+	dma_struct_para_init(&dma_init_struct);
+
+	//FIX: memory_addr, number
+	dma_init_struct.direction = DMA_MEMORY_TO_PERIPHERAL; 
+	dma_init_struct.memory_addr = (uint32_t)&dma_buffer_color; 
+	dma_init_struct.memory_inc = DMA_MEMORY_INCREASE_DISABLE; 
+	dma_init_struct.memory_width = DMA_MEMORY_WIDTH_16BIT; 			//Buffer 8 bits of data / transfer
+	//dma_init_struct.number = (LCD_X_MAX * LCD_Y_MAX) << 1; 			//2 bytes per pixel. There are 240x240 pixels
+	dma_init_struct.periph_addr = (uint32_t)((_spi_perpih) + 0x0CU);
+	dma_init_struct.periph_inc = DMA_PERIPH_INCREASE_DISABLE; 
+	dma_init_struct.periph_width = DMA_PERIPHERAL_WIDTH_16BIT; 		//SPIx 8 bit data
+	dma_init_struct.priority = DMA_PRIORITY_ULTRA_HIGH;				//Highest prio
+
+	//dma_circulation_enable(dma_periph, dma_channel);
+
+	dma_init(dma_periph, dma_channel, &dma_init_struct);
+}
+
+
+//dma_transfer_number_get() to get the remaining data to be transfered!
+
+FlagStatus dma_get_channel_enable_flag(){
+
+	//DMAx base adre
+	//Channel x control register (DMA_CHxCTL)
+
+	//CHEN is bit 0
+
+	//0: Disable channel
+	//1: Enable channel
+}
+
+/**
+ * @brief Preps DMA and SPI for transfer
+ * @param[in]: number: Total amount of transfers.
+ */
+static void dma_prep(uint32_t number){
+
+	//Turn off SPI and DMA for config
+	spi_dma_disable(spi_perpih, SPI_DMA_TRANSMIT);
+	dma_channel_disable(dma_periph, dma_channel);
+
+	//Set SPI 16-bit data format
+	spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_16BIT);
+	//Set number of DMA transfers
+	dma_transfer_number_config(dma_periph, dma_channel, number); // Send 3 transfers
+
+
+	//Aktivate SPI and DMA
+	dma_channel_enable(dma_periph, dma_channel);
+	spi_dma_enable(spi_perpih, SPI_DMA_TRANSMIT);
+}
+//DMA functions end 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //SPI functions begin
@@ -129,23 +213,26 @@ typedef struct{
 spi_data buff[BUFF_SIZE] = {0};
 int tail = 0, head = 0;
 
-
 /**
  * @brief initialises LCD. OBS
- * \param[in]: spi_periph: SPIx(x=0,1,2)
- * \param[in]: gpio_periph: GPIOx(x = A,B,C,D,E). OBS! Once chosen, base all GPIO pins on input param!
- * \param[in]: clk: SPI clock pin
- * \param[in]: din: SPI data out (MOSI)
- * \param[in]: rst: Reset => GPIO_PIN_x(x=0..15) 
- * \param[in]: cs: Chip select => GPIO_PIN_x(x=0..15)
- * \param[in]: dc: Data or cmd => GPIO_PIN_x(x=0..15)
+ * @param[in]: spi_periph: SPIx(x=0,1,2)
+ * @param[in]: _dma_periph: DMAx(x=0,1)
+ * @param[in]: _channel: specify which DMA channel is initialized only one parameter can be selected => DMA0: DMA_CHx(x=0..6), DMA1: DMA_CHx(x=0..4)
+ * @param[in]: gpio_periph: GPIOx(x = A,B,C,D,E). OBS! Once chosen, base all GPIO pins on input param!
+ * @param[in]: clk: SPI clock pin
+ * @param[in]: din: SPI data out (MOSI)
+ * @param[in]: rst: Reset => GPIO_PIN_x(x=0..15) 
+ * @param[in]: cs: Chip select => GPIO_PIN_x(x=0..15)
+ * @param[in]: dc: Data or cmd => GPIO_PIN_x(x=0..15)
  */
-void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32_t _din, uint32_t _rst, uint32_t _cs, uint32_t _dc){
+void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _gpio_perpih, uint32_t _clk, uint32_t _din, uint32_t _rst, uint32_t _cs, uint32_t _dc){
 	spi_perpih = _spi_perpih;
 	gpio_perpih = _gpio_perpih;
 	rst = _rst;
 	cs = _cs;
 	dc = _dc;
+
+	lcd_dma_init(_dma_periph, _channel, spi_perpih);
 
 	/**
 	 * Init RCU for SPI and GPIO
@@ -194,6 +281,7 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	spi_param.clock_polarity_phase= SPI_CK_PL_LOW_PH_1EDGE;
 	spi_param.prescale = SPI_PSC_4;	//TODO: Change later to higher!
 
+
 	//Init spi
 	spi_init(spi_perpih, &spi_param);
 	
@@ -202,11 +290,13 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	 */
 	spi_enable(spi_perpih);
 
+	
 	//HW reset (Reset low for 10-20ms)
 	gpio_bit_reset(gpio_perpih, rst);
 	delay_ms(40);
 	gpio_bit_set(gpio_perpih, rst);
 
+	
 	//SW reset (CMD: 0x01, wait 120ms)
 	lcd_wr_cmd(SWRESET);
 	lcd_queue_flush_blocking();
@@ -231,6 +321,8 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	lcd_wr_cmd(DISPON);
 	//Write data
 	lcd_queue_flush_blocking();
+
+	
 }
 
 /**
@@ -786,6 +878,28 @@ void lcd_showPicture(uint8_t *bitMap){
     }
 }
 
+
+
+void lcd_dma_clear(color color){
+
+	setWindow(0, LCD_X_MAX, 0, LCD_Y_MAX);				//Set window
+	lcd_queue_flush_blocking();
+	
+	uint8_t FACTOR = 1;
+
+	cs_clr();
+	dc_set();
+
+	
+	dma_buffer_color = (uint16_t)color;
+	dma_prep(LCD_X_MAX * LCD_Y_MAX);
+
+	
+
+	// 5. Vänta på DMA-sändning
+	while (!dma_flag_get(dma_periph, dma_channel, DMA_FLAG_FTF));
+
+}
 //LCD functions ends
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Auxillary
