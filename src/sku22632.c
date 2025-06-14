@@ -84,11 +84,23 @@ int main(void){
 	lcd_init(SPI0, DMA0, DMA_CH2, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
 	//lcd_showPicture(kub_map_v4);
 
-	lcd_dma_clear(RED);
-	while(1){
-		//lcd_queue_flush();
+	const color color_list[] = {
+    WHITE, BLACK, RED, GREEN, BLUE,
+    YELLOW, CYAN, MAGENTA, BROWN, BRRED,
+    GRAY, DARKBLUE, LIGHTBLUE, GRAYBLUE,
+    LIGHTGREEN, LGRAY, DGRAY, LGRAYBLUE,
+    LBBLUE, BRED, GRED, GBLUE
+	};
+
+	const int color_count = sizeof(color_list) / sizeof(color_list[0]);
 
 	
+	while(1){
+		//lcd_queue_flush();
+		for (int i = 0; i < color_count; i++) {
+		lcd_dma_clear(color_list[i]);
+		//delay_ms(500);
+		}
 	}
 	return 0;
 }
@@ -898,6 +910,8 @@ void lcd_dma_clear(color color){
 
 	// 5. Vänta på DMA-sändning
 	while (!dma_flag_get(dma_periph, dma_channel, DMA_FLAG_FTF));
+
+	spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_8BIT);
 
 }
 //LCD functions ends
