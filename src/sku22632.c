@@ -101,7 +101,7 @@ int main(void){
 		lcd_queue_flush();
 		for (int i = 0; i < color_count; i++) {
 		lcd_clear(color_list[i]);
-		//delay_ms(500);
+		delay_ms(100);
 		}
 	}
 	return 0;
