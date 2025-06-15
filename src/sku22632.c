@@ -28,7 +28,8 @@ typedef enum{
 }cmd;
 
 static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _spi_perpih);
-static void dma_prep(uint32_t number);
+static void dma_prep_on(uint32_t number);
+static void dma_prep_off(void);
 
 static void lcd_wr_data(const uint8_t data);
 static void lcd_wr_cmd(const cmd data);
@@ -37,7 +38,7 @@ static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, c
 static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color);
 
 //Auxillery functions
-static void delay_ms(uint8_t ms);
+static void delay_ms(uint16_t ms);
 
 /**
  * SPI base
@@ -92,6 +93,9 @@ int main(void){
     LBBLUE, BRED, GRED, GBLUE
 	};
 
+	setWindow(0, LCD_X_MAX, 0, LCD_Y_MAX);				//Set window
+	lcd_queue_flush_blocking();
+
 	const int color_count = sizeof(color_list) / sizeof(color_list[0]);
 
 	
@@ -99,13 +103,38 @@ int main(void){
 		//lcd_queue_flush();
 		for (int i = 0; i < color_count; i++) {
 		lcd_dma_clear(color_list[i]);
-		//delay_ms(500);
+		delay_ms(1000);
 		}
 	}
 	return 0;
 }
 
 
+
+/**
+ * @brief Delays (blocking)
+ * @param[in] ms: Amount of ms to delay
+ */
+static void delay_ms(uint16_t ms){
+	volatile long long base = 7200; 	//Base
+	base = base*(long long)ms;			//Mult base with ms
+	while(--base) __asm__ volatile("nop");
+}
+static inline void dc_set(void) {
+    gpio_bit_set(gpio_perpih, dc);
+}
+
+static inline void dc_clr(void) {
+    gpio_bit_reset(gpio_perpih, dc);
+}
+
+static inline void cs_set(void) {
+    gpio_bit_set(gpio_perpih, cs);
+}
+
+static inline void cs_clr(void) {
+    gpio_bit_reset(gpio_perpih, cs);
+}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //DMA functions begin 
 
@@ -153,60 +182,42 @@ static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32
 	dma_init(dma_periph, dma_channel, &dma_init_struct);
 }
 
-
-//dma_transfer_number_get() to get the remaining data to be transfered!
-
-FlagStatus dma_get_channel_enable_flag(){
-
-	//DMAx base adre
-	//Channel x control register (DMA_CHxCTL)
-
-	//CHEN is bit 0
-
-	//0: Disable channel
-	//1: Enable channel
-}
-
 /**
  * @brief Preps DMA and SPI for transfer
  * @param[in]: number: Total amount of transfers.
  */
-static void dma_prep(uint32_t number){
-
+static void dma_prep_on(uint32_t number){
+	
+	dma_flag_clear(dma_periph, dma_channel, DMA_FLAG_FTF);				//clear full transfer flag
 	//Turn off SPI and DMA for config
 	spi_dma_disable(spi_perpih, SPI_DMA_TRANSMIT);
 	dma_channel_disable(dma_periph, dma_channel);
-
+	
 	//Set SPI 16-bit data format
 	spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_16BIT);
 	//Set number of DMA transfers
 	dma_transfer_number_config(dma_periph, dma_channel, number); // Send 3 transfers
-
-
-	//Aktivate SPI and DMA
+	
+	//Activate SPI and DMA
 	dma_channel_enable(dma_periph, dma_channel);
 	spi_dma_enable(spi_perpih, SPI_DMA_TRANSMIT);
+}
+
+static void dma_prep_off(void){
+	while ( !dma_flag_get(dma_periph, dma_channel, DMA_FLAG_FTF) );
+	
+	//Turn off SPI and DMA to config back to original settings
+	spi_dma_disable(spi_perpih, SPI_DMA_TRANSMIT);				
+	dma_channel_disable(dma_periph, dma_channel);						
+	spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_8BIT);	//Reset to 8-bit SPI data
+	
+	cs_set();															//Disable LCD chip
 }
 //DMA functions end 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //SPI functions begin
-static inline void dc_set(void) {
-    gpio_bit_set(gpio_perpih, dc);
-}
-
-static inline void dc_clr(void) {
-    gpio_bit_reset(gpio_perpih, dc);
-}
-
-static inline void cs_set(void) {
-    gpio_bit_set(gpio_perpih, cs);
-}
-
-static inline void cs_clr(void) {
-    gpio_bit_reset(gpio_perpih, cs);
-}
 #define BUFF_SIZE 512
 /**
  * Struct for SPI data
@@ -894,35 +905,28 @@ void lcd_showPicture(uint8_t *bitMap){
 
 void lcd_dma_clear(color color){
 
-	setWindow(0, LCD_X_MAX, 0, LCD_Y_MAX);				//Set window
-	lcd_queue_flush_blocking();
-	
-	uint8_t FACTOR = 1;
+	curr_backgr = color;
+
+	//setWindow(0, LCD_X_MAX, 0, LCD_Y_MAX);				//Set window
+	//lcd_queue_flush_blocking();
 
 	cs_clr();
 	dc_set();
 
 	
 	dma_buffer_color = (uint16_t)color;
-	dma_prep(LCD_X_MAX * LCD_Y_MAX);
+	dma_prep_on(LCD_X_MAX * LCD_Y_MAX);
 
-	
+	dma_prep_off();
 
 	// 5. Vänta på DMA-sändning
-	while (!dma_flag_get(dma_periph, dma_channel, DMA_FLAG_FTF));
-
+	while ( !dma_flag_get(dma_periph, dma_channel, DMA_FLAG_FTF) );
+	spi_disable(spi_perpih);
+	//spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_8BIT);
+	spi_dma_disable(spi_perpih, SPI_DMA_TRANSMIT);
+	dma_channel_disable(dma_periph, dma_channel);
 	spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_8BIT);
-
+	spi_enable(spi_perpih);
 }
 //LCD functions ends
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Auxillary
-/**
- * @brief Delays (blocking)
- * @param[in] ms: Amount of ms to delay
- */
-static void delay_ms(uint8_t ms){
-	volatile long long base = 7200; 	//Base
-	base = base*(long long)ms;			//Mult base with ms
-	while(--base) __asm__ volatile("nop");
-}
