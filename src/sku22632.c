@@ -9,6 +9,10 @@ Libraries (other than vendor SDK and gcc libraries) must have .h-files in /lib/[
 #include "../include/sku22632.h"
 #include "../include/lcd_font.h"
 
+#define PI 3.14159265f
+//#include <math.h>
+
+
 typedef enum{
 	SWRESET = 0x01,	//SW reset
 	SLPIN = 0x10,	//LCD power saving mode
@@ -34,7 +38,7 @@ static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, c
 static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color);
 
 //Auxillery functions
-static void delay_ms(uint8_t ms);
+static void delay_ms(uint16_t ms);
 
 /**
  * SPI base
@@ -68,41 +72,42 @@ static uint32_t dc;
  */
 static color curr_backgr;
 
+uint16_t test_wave[LCD_X_MAX];
+
+void generate_test_wave(void) {
+    for (int i = 0; i < LCD_X_MAX; i++) {
+        // Enkel såg- eller triangelvåg
+        test_wave[i] = 60 + (i % 120);  // mellan 60 och 180
+    }
+}
+
+
+void draw_waveform(uint16_t* buffer) {
+    lcd_clear(BLACK); // Rensa hela skärmen
+
+    for (int x = 0; x < LCD_X_MAX - 1; x++) {
+        uint16_t y1 = buffer[x];
+        uint16_t y2 = buffer[x + 1];
+        lcd_drawLine(x, x+1, y1, y2, GREEN);
+    }
+}
+
+
 int main(void){
 
 	lcd_init(SPI0, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
 
-	/*
-	lcd_drawLine(0, 240, 120, 120, BLACK);
-
-	lcd_ShowCh(20,20,'2', RED, BIG);
-	lcd_ShowCh(40,20,'2', RED, SMALL);
-
-	lcd_showStr(8,100, "Hello World!!!!!!!!!!",RED, BIG);
-
-	lcd_showNum(20, 200, 0, GREEN, SMALL);
 	
-	lcd_showNum_float(50,200, 222.99, 2, RED, BIG);
-	*/
-	lcd_showPicture(kub_map_v4);
-
-	const color color_list[] = {
-    WHITE, BLACK, RED, GREEN, BLUE,
-    YELLOW, CYAN, MAGENTA, BROWN, BRRED,
-    GRAY, DARKBLUE, LIGHTBLUE, GRAYBLUE,
-    LIGHTGREEN, LGRAY, DGRAY, LGRAYBLUE,
-    LBBLUE, BRED, GRED, GBLUE
-	};
-
-	const int color_count = sizeof(color_list) / sizeof(color_list[0]);
-
-	
+	lcd_drawLine(0,LCD_X_MAX, LCD_Y_MAX / 2, LCD_Y_MAX / 2, BLACK);
+	uint16_t x = 0;
+		
 	while(1){
+
 		lcd_queue_flush();
-		for (int i = 0; i < color_count; i++) {
-		lcd_clear(color_list[i]);
-		delay_ms(100);
-		}
+		generate_test_wave();
+		draw_waveform(test_wave);
+
+
 	}
 	return 0;
 }
@@ -541,6 +546,9 @@ void lcd_drawCircle_filled(uint16_t xs, uint16_t ys, uint16_t r, color color){
     int16_t y = r;
     int16_t d = 1 - r;
 
+	if( xs < r ) xs = r;
+	if( ys < r) ys = r;
+
     while (y >= x) {
         // Ritar horisontella linjer mellan symmetriska punkter i alla oktanter
 
@@ -806,7 +814,7 @@ void lcd_showPicture(uint8_t *bitMap){
  * @brief Delays (blocking)
  * @param[in] ms: Amount of ms to delay
  */
-static void delay_ms(uint8_t ms){
+static void delay_ms(uint16_t ms){
 	volatile long long base = 7200; 	//Base
 	base = base*(long long)ms;			//Mult base with ms
 	while(--base) __asm__ volatile("nop");
