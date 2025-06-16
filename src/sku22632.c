@@ -93,18 +93,29 @@ int main(void){
     LBBLUE, BRED, GRED, GBLUE
 	};
 
-	setWindow(0, LCD_X_MAX, 0, LCD_Y_MAX);				//Set window
-	lcd_queue_flush_blocking();
+	//setWindow(0, LCD_X_MAX, 0, LCD_Y_MAX);				//Set window
+	//lcd_queue_flush_blocking();
 
 	const int color_count = sizeof(color_list) / sizeof(color_list[0]);
 
+	//delay_ms(1000);
+	lcd_dma_clear(GREEN);
+	//lcd_queue_flush_blocking();
+	//delay_ms(2000);
+	
 	
 	while(1){
 		//lcd_queue_flush();
+		//lcd_drawCircle_filled(120,120,20, BLACK);
+		//lcd_dma_clear(BLUE);
+
+
+		/*
 		for (int i = 0; i < color_count; i++) {
 		lcd_dma_clear(color_list[i]);
 		delay_ms(1000);
 		}
+		*/
 	}
 	return 0;
 }
@@ -138,11 +149,272 @@ static inline void cs_clr(void) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //DMA functions begin 
 
+
+//TODO:
+	//Måste dela upp!
+	//1 funktion som används av ALLA funktioner! Vad för argument delar 
+	//enums för kommandon
+
+
+
+//Place calls in buffer, handle when able. Use a buffer (takes function pointer (must be same type!))
+//Buffer to store function calls
+//DMA interrupt when finished
+
+//Down to up:
+	//Command OR data? Set / Reset DC (function pointer!!!!)
+		//Command:
+			//Data command (enum)
+				//Set SPI to write CMD <1 byte>
+		//Data:
+			//Coordinates. Antingen Samma (cirkel) eller olika
+			//Color
+			//what type? Ex. Str or Ch or Circle? Extra argument! Stösta Str: 16 eller 17 chars
+
+/**
+ * What the data is used to draw / write on LCD
+ * CIRCLE
+ * RECTANGLE
+ * NUMBER
+ * TEXT
+ */
+/*
+typedef enum{
+	CIRCLE = 0,
+	RECTANGLE,
+	NUMBER,
+	TEXT
+}data_type;
+*/
+/**
+ * If geomitry figure is filled or hollow
+ * FILLED
+ * HOLLOW
+ */
+/*
+typedef enum{
+	FILLED = 0,
+	HOLLOW
+}draw_type;
+*/
+/**
+ * If number is integer or float type
+ * INTEGER
+ * FLOAT
+ */
+/*
+typedef enum{
+	INTEGER = 0,
+	FLOAT
+}numb_type;
+*/
+/**
+ * If single character or string
+ * CHAR
+ * STRING
+ */
+/*
+typedef enum{
+	CHAR = 0,
+	STRING,
+}text_type;
+*/
+/**
+ * Circle Struct
+ * x: Center x coordiante
+ * y: center y coordinate
+ * r: radie
+ */
+/*
+typedef struct{
+	const draw_type type;
+	const uint16_t x;
+	const uint16_t y;
+	const uint16_t r;
+	const color color;
+}circle_t;
+*/
+/**
+ * Rectangle struct
+ */
+/*
+typedef struct{
+	const draw_type type;
+	const uint16_t xs;
+	const uint16_t xe;
+	const uint16_t ys;
+	const uint16_t ye;
+	color color;
+}rect_t;
+*/
+/**
+ * Number struct
+ */
+/*
+typedef struct{
+	const numb_type type;
+	const uint16_t x;
+	const uint16_t y;
+	const union{
+		int i;
+		float f;
+	}val;
+	const color _color;
+	const font_size size;
+}numb_t;
+
+#define STR_MAX_SIZE 16
+typedef struct{
+	const text_type type;
+	const uint16_t x;
+	const uint16_t y;
+	const union{
+		uint8_t ch;
+		uint8_t str[STR_MAX_SIZE];
+	}val;
+	const color color;
+	const font_size size;
+}text_t;
+*/
+
+/**
+ * LCD command
+ */
+/*
+typedef struct{
+	const uint16_t command;
+}dma_spi_cmd_t;
+*/
+/**
+ * LCD data
+ */
+/*
+typedef struct{
+	data_type type;				//What kind of object
+	const union{
+		circle_t circle;
+		rect_t rect;
+		numb_t numb;
+		text_t text;
+	}object;
+}dma_spi_data_t;
+*/
+/**
+ * What kind of type the command is
+ */
+/*
+typedef enum{
+	DATA = 0,
+	CMD
+}dma_spi_type;
+*/
+/**
+ * Struct used by buffer to store function calls if DMA is occupied.
+ */
+/*
+typedef struct{
+	dma_spi_type type;			//What kind of information. Command or data
+	union{
+		uint16_t command;		//Command
+		dma_spi_data_t data;	//Data
+	}dma_spi_payload;
+}dma_spi_t;
+
+#define DMA_BUFF_SIZE 512
+static dma_spi_t dma_spi_buffer[DMA_BUFF_SIZE] = {0};
+int dma_tail = 0, dma_head = 0;
+*/
+/**
+ * @brief Writes data to SPI buffer to be sent
+ * @param[in] data: Data to be written by SPI
+ */
+/*
+static void dma_lcd_wr(const dma_spi_t data){
+	while(((dma_head + 1) & (DMA_BUFF_SIZE - 1)) == dma_tail) lcd_queue_flush(); //Flush buff if FULL
+	dma_spi_buffer[dma_head] = data;									//Add data to buffer
+	dma_head = (dma_head + 1) & (DMA_BUFF_SIZE - 1);		//Inrement and wrap head. (BUFF_SIZE - 1 = bitmask of 1's)
+}
+*/
+
+//Enable SPI interrupt as well!
+
+/**
+ * DMA0 channel 2 ISR
+ */
+/*
+void DMA0_Channel2_IRQHandler(void) {
+    //Clear flags (IF and FULL SEND)
+	//Check what flag. FULL SEND
+	//Check if buffer empty?
+		//NO: set cs LOW, get next data from buffer & check type (conf DC), config DMA and send data (set amount of data to be sent!)
+		//YES: Set CS high
+
+	//Previous type transmitted by DMA
+	static dma_spi_type prev_type;
+
+
+	if( dma_flag_get(dma_periph, dma_channel, DMA_FLAG_FTF) ){
+		dma_flag_clear(dma_periph, dma_channel, DMA_FLAG_FTF);				//clear full transfer flag
+
+		if( dma_head != dma_tail ){											//Buffer is NOT empty
+			cs_clr();	//Activate LCD
+
+			if( dma_spi_buffer[dma_tail].type != prev_type){				
+				dma_spi_buffer[tail].type == DATA ? dc_set() : dc_clr();	//Data or cmd
+				prev_type = dma_spi_buffer[tail].type;
+			}
+
+			if( dma_spi_buffer[dma_tail].type == DATA ){
+				dma_data = (uint16_t)dma_spi_buffer[tail].;
+				dma_transfer_number_config(dma_periph, dma_channel, number); // Send 3 transfers
+
+				switch( dma_spi_buffer[tail].dma_spi_payload.data.type ){	 //Get object type!
+					case CIRCLE:
+					case RECTANGLE:
+					case NUMBER:
+					case TEXT:
+				}
+
+
+			}else{
+				dma_data = dma_spi_buffer[tail].dma_spi_payload.command;
+				dma_transfer_number_config(dma_periph, dma_channel, 1); //Send 1 transfer (command)
+			}
+
+		}else{	
+			cs_set();	//De-activate LCD
+		}
+	}
+	
+}
+*/
+
+/**
+ * @brief Write LCD command
+ * @param[in]: Data to be transmitted
+ */
+/*
+static void dma_lcd_wr_cmd(const cmd data){
+	//spi_data _data = {0, (uint8_t)data};
+	//dma_lcd_wr(_data);
+}
+*/
+/**
+ * @brief Write LCD data
+ * @param[in]: Data to be transmitted
+ */
+/*
+static void dma_lcd_wr_data(const uint8_t data){
+	//spi_data _data = {1, data};
+	//lcd_wr(_data);
+}
+	*/
+
+
 /**
  * LCD data buffer. Fill with pixel value and let DMA transmit to SPI
- * FIX: buffer size
  */
-static uint16_t dma_buffer_color;
+static uint16_t dma_data;
 
 /**
  * @brief Initialises DMA pherip and channel used by LCD
@@ -168,7 +440,7 @@ static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32
 
 	//FIX: memory_addr, number
 	dma_init_struct.direction = DMA_MEMORY_TO_PERIPHERAL; 
-	dma_init_struct.memory_addr = (uint32_t)&dma_buffer_color; 
+	dma_init_struct.memory_addr = (uint32_t)&dma_data; 
 	dma_init_struct.memory_inc = DMA_MEMORY_INCREASE_DISABLE; 
 	dma_init_struct.memory_width = DMA_MEMORY_WIDTH_16BIT; 			//Buffer 8 bits of data / transfer
 	//dma_init_struct.number = (LCD_X_MAX * LCD_Y_MAX) << 1; 			//2 bytes per pixel. There are 240x240 pixels
@@ -179,6 +451,10 @@ static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32
 
 	//dma_circulation_enable(dma_periph, dma_channel);
 
+	dma_interrupt_enable(DMA0, DMA_CH2, DMA_INT_FTF); 
+	//eclic_priority_group_set(ECLIC_PRIGROUP_LEVEL3_PRIO1); 
+	eclic_irq_enable(DMA0_Channel2_IRQn, 1, 1);
+	eclic_global_interrupt_enable(); 
 	dma_init(dma_periph, dma_channel, &dma_init_struct);
 }
 
@@ -188,7 +464,8 @@ static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32
  */
 static void dma_prep_on(uint32_t number){
 	
-	dma_flag_clear(dma_periph, dma_channel, DMA_FLAG_FTF);				//clear full transfer flag
+	//dma_flag_clear(dma_periph, dma_channel, DMA_FLAG_FTF);				//clear full transfer flag
+
 	//Turn off SPI and DMA for config
 	spi_dma_disable(spi_perpih, SPI_DMA_TRANSMIT);
 	dma_channel_disable(dma_periph, dma_channel);
@@ -362,9 +639,13 @@ void lcd_clear(color color){
 }
 
 /**
- * \brief Queue for LCD. Call first in superloop
+ * \brief Queue for LCD. Call first in superloop. Gets blocked if DMA transfer is active
  */
 void lcd_queue_flush(void){
+
+	//Block function if DMA transfer is underway!
+	//TODO: RISK!!!! If lcd_Wr called and DMA underway, might be a race condition and stale mate!!
+	if( dma_transfer_number_get(dma_periph, dma_channel) > 0 ) return;
 	//Prev_type indicate if needed to toggle DC 
 	static uint8_t prev_type = 0;
 
@@ -384,7 +665,7 @@ void lcd_queue_flush(void){
 		}
 	
 	}else{
-		if(  spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET ) cs_set();
+		if( spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET ) cs_set();
 	}	
 }
 
@@ -902,31 +1183,60 @@ void lcd_showPicture(uint8_t *bitMap){
 }
 
 
-
 void lcd_dma_clear(color color){
 
-	curr_backgr = color;
+	setWindow(0, LCD_X_MAX - 1, 0, LCD_Y_MAX - 1);			//Set window
+	lcd_queue_flush_blocking();
 
-	//setWindow(0, LCD_X_MAX, 0, LCD_Y_MAX);				//Set window
-	//lcd_queue_flush_blocking();
+	curr_backgr = color;									//Save current background
 
 	cs_clr();
 	dc_set();
 
 	
-	dma_buffer_color = (uint16_t)color;
+	dma_data = (uint16_t)color;
 	dma_prep_on(LCD_X_MAX * LCD_Y_MAX);
 
-	dma_prep_off();
+	//dma_prep_off();
 
-	// 5. Vänta på DMA-sändning
+	//Wait for DMA transfer to complete
+	//TODO: Change this to happen in interrupt!
+	/*
 	while ( !dma_flag_get(dma_periph, dma_channel, DMA_FLAG_FTF) );
-	spi_disable(spi_perpih);
-	//spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_8BIT);
-	spi_dma_disable(spi_perpih, SPI_DMA_TRANSMIT);
-	dma_channel_disable(dma_periph, dma_channel);
-	spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_8BIT);
-	spi_enable(spi_perpih);
+		dma_flag_clear(dma_periph, dma_channel, DMA_FLAG_FTF);				//clear full transfer flag
+		spi_disable(spi_perpih);
+		//spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_8BIT);
+		spi_dma_disable(spi_perpih, SPI_DMA_TRANSMIT);
+		dma_channel_disable(dma_periph, dma_channel);
+		spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_8BIT);
+		spi_enable(spi_perpih);
+
+		lcd_drawCircle_filled(120,120, 20, RED);
+	*/
 }
+
+/**
+ * DMA0 channel 2 ISR
+ */
+void DMA0_Channel2_IRQHandler(void){
+	//lcd_drawCircle_filled(120,120, 20, RED);
+	volatile int i = 0;
+	//cs_set();
+	if( dma_interrupt_flag_get(dma_periph, dma_channel, DMA_INT_FLAG_FTF ) == RESET){
+		//dma_interrupt_flag_clear(dma_periph, dma_channel, DMA_INT_FLAG_FTF );				//clear full transfer flag
+		//spi_disable(spi_perpih);
+		//spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_8BIT);
+		
+		//spi_dma_disable(spi_perpih, SPI_DMA_TRANSMIT);
+		//dma_channel_disable(dma_periph, dma_channel);
+		//spi_i2s_data_frame_format_config(spi_perpih, SPI_FRAMESIZE_8BIT);
+		
+		//spi_enable(spi_perpih);
+		
+		//lcd_drawCircle_filled(120,120, 20, RED);
+	}
+	
+}
+
 //LCD functions ends
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -58,7 +58,7 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _chan
  */
 void lcd_clear(color color);
 /**
- * \brief Queue for LCD. Call first in superloop
+ * \brief Queue for LCD. Call first in superloop. Gets blocked if DMA transfer is active
  */
 void lcd_queue_flush(void);
 /**
