@@ -123,16 +123,8 @@ int main(void){
 
 	//lcd_showPicture(kub_map_v4);
 	
-
-
-
-
-	
 	while(1){
 		dma_buffer_flush();
-
-
-
 	}
 
 	return 0;
