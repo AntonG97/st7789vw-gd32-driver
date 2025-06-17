@@ -31,19 +31,40 @@ typedef enum{
 	WRDISBV = 0x51,	//Write display brightness + 1 byte (0x00 => Lowest 0xFF => Highest)
 }cmd;
 
-static void lcd_wr_data(const uint8_t data);
-static void lcd_wr_cmd(const cmd data);
-static void lcd_queue_flush_blocking(void);
-static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye);
-static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color);
+typedef struct{
+	uint32_t amount_trans;		//Amount of transfers
+	uint8_t type;				//LOW (0) => HIGH (1) => Data			
+	uint16_t payload;					
+}dma_spi_data_t;
+
+//DMA
+static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _spi_perpih);
+static void dma_lcd_wr(const dma_spi_data_t data);
+static void dma_lcd_wr_cmd(const cmd payload);
+static void dma_lcd_wr_data(const uint16_t payload, const uint32_t amount);
+static void dma_buffer_flush_blocking(void);
 
 //Auxillery functions
+static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye);
+static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color);
 static void delay_ms(uint16_t ms);
+static inline void dc_set(void);
+static inline void dc_clr(void);
+static inline void cs_set(void);
+static inline void cs_clr(void);
 
 /**
  * SPI base
  */
 static uint32_t spi_perpih;
+/**
+ * DMA base
+ */
+static uint32_t dma_periph;
+/**
+ * DMA channel
+ */
+static dma_channel_enum dma_channel;
 
 /**
  * GPIO base
@@ -72,98 +93,227 @@ static uint32_t dc;
  */
 static color curr_backgr;
 
-uint16_t test_wave[LCD_X_MAX];
-
-void generate_test_wave(void) {
-    for (int i = 0; i < LCD_X_MAX; i++) {
-        // Enkel såg- eller triangelvåg
-        test_wave[i] = 60 + (i % 120);  // mellan 60 och 180
-    }
-}
-
-
-void draw_waveform(uint16_t* buffer) {
-    lcd_clear(BLACK); // Rensa hela skärmen
-
-    for (int x = 0; x < LCD_X_MAX - 1; x++) {
-        uint16_t y1 = buffer[x];
-        uint16_t y2 = buffer[x + 1];
-        lcd_drawLine(x, x+1, y1, y2, GREEN);
-    }
-}
-
 
 int main(void){
 
-	lcd_init(SPI0, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
+	//TODO: ShowNum_float is bugged when writing 10.xxx
 
+	lcd_init(SPI0, DMA0, DMA_CH2, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
+
+	rcu_periph_clock_enable(RCU_GPIOB);
+	gpio_init(GPIOB, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_10);
+	gpio_bit_reset(GPIOB, GPIO_PIN_10);
+
+	setWindow(0,120,0,120);
+	fillWindow(0,120,0,120, RED);
+
+	lcd_drawPixel(150,150,RED);
+	lcd_drawPixel_big(170,170,RED);
+
+	lcd_drawLine(0,240,240,0,GREEN);
+
+	lcd_drawRec(50,100,50,100,BLACK);
+	lcd_drawRec_filled(50,100,50,100,GRAY);
+
+	lcd_drawCircle(120,120,20, GRED);
+	lcd_drawCircle_filled(120,120,18, MAGENTA);
+
+	lcd_ShowCh(150,150,'A', RED);
+	lcd_showStr(10,170,"FUCK", GREEN);
+
+	lcd_showNum(10,10,99, BLACK);
+
+	lcd_showNum_float(160,40,1000.7854,2, BLACK);
+
+	//lcd_showPicture(kub_map_v4);
 	
-	lcd_drawLine(0,LCD_X_MAX, LCD_Y_MAX / 2, LCD_Y_MAX / 2, BLACK);
-	uint16_t x = 0;
-		
 	while(1){
-
-		lcd_queue_flush();
-		generate_test_wave();
-		draw_waveform(test_wave);
-
-
+		dma_buffer_flush();
 	}
+
 	return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//SPI functions begin
-static inline void dc_set(void) {
-    gpio_bit_set(gpio_perpih, dc);
-}
-
-static inline void dc_clr(void) {
-    gpio_bit_reset(gpio_perpih, dc);
-}
-
-static inline void cs_set(void) {
-    gpio_bit_set(gpio_perpih, cs);
-}
-
-static inline void cs_clr(void) {
-    gpio_bit_reset(gpio_perpih, cs);
-}
-#define BUFF_SIZE 512
+//DMA functions begin 
+#define DMA_BUFFER_SIZE 256
 /**
- * Struct for SPI data
- * @param type: Kind of data. 0 = cmd and 1 = data
- * @param data: Data to be sent
+ * DMA data buffer
  */
-typedef struct{
-	//0 = cmd, 1 = data
-	uint8_t type;
-	uint8_t data;
-}spi_data;
-
-/*
- * Spi data buffer
+static dma_spi_data_t dma_buffer[DMA_BUFFER_SIZE];
+/**
+ * LCD data buffer. Fill with pixel value and let DMA transmit to SPI
  */
-spi_data buff[BUFF_SIZE] = {0};
-int tail = 0, head = 0;
+static uint16_t dma_data;
+/**
+ * Variables used in DMA buffer logic
+ */
+static int dma_head = 0, dma_tail = 0;
+/**
+ * @brief Place in beginning of superloop. Handles DMA queue
+ */
+void dma_buffer_flush(void){
+	/**
+	 * Variable is used to DMA ISR to correctly set GPIOx pins based on previous and current data to be transmitted
+	 */
+	static uint8_t prev_type = 0;
 
+	if( dma_head != dma_tail ){						//Buffer is NOT empty!
+
+		//If same type and SPI tx buffer ready for data!
+		if( dma_buffer[dma_tail].type == prev_type && spi_i2s_flag_get(spi_perpih, SPI_FLAG_TBE) == SET ){
+			cs_clr();
+			dma_channel_disable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_data = dma_buffer[dma_tail].payload;
+			dma_transfer_number_config(dma_periph, dma_channel, dma_buffer[dma_tail].amount_trans);
+
+			dma_channel_enable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1);
+
+		//Different types and SPI has finished transmitting
+		}else if( dma_buffer[dma_tail].type != prev_type && spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET ){
+			cs_clr();
+			dma_channel_disable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_data = dma_buffer[dma_tail].payload;
+			dma_buffer[dma_tail].type ? dc_set() : dc_clr();	//Data or cmd
+			prev_type = dma_buffer[dma_tail].type;
+			dma_transfer_number_config(dma_periph, dma_channel, dma_buffer[dma_tail].amount_trans);
+
+			dma_channel_enable(dma_periph, dma_channel); 	//Start DMA transfer
+			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1);
+		}
+
+	}else{
+		if( spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET ){
+		cs_set();
+		dma_channel_disable(dma_periph, dma_channel);
+		}
+	}
+}
+
+/**
+ * @brief Function used by initialisation of LCD. Blocking
+ */
+static void dma_buffer_flush_blocking(void){
+    static uint8_t prev_type = 0;
+    while( dma_head != dma_tail ){						//Buffer is NOT empty!
+
+		//If same type and SPI tx buffer ready for data!
+		if( dma_buffer[dma_tail].type == prev_type && spi_i2s_flag_get(spi_perpih, SPI_FLAG_TBE) == SET ){
+			cs_clr();
+			dma_channel_disable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_data = dma_buffer[dma_tail].payload;
+			dma_transfer_number_config(dma_periph, dma_channel, dma_buffer[dma_tail].amount_trans);
+
+			dma_channel_enable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1);
+		//Different types and SPI has finished transmitting
+		}else if( dma_buffer[dma_tail].type != prev_type && spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET ){
+			cs_clr();
+			dma_channel_disable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_data = dma_buffer[dma_tail].payload;
+			dma_buffer[dma_tail].type ? dc_set() : dc_clr();	//Data or cmd
+			prev_type = dma_buffer[dma_tail].type;
+			dma_transfer_number_config(dma_periph, dma_channel, dma_buffer[dma_tail].amount_trans);
+
+			dma_channel_enable(dma_periph, dma_channel); 	//Start DMA transfer
+			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1);
+		}
+	}
+
+    while(spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) != RESET);
+    cs_set();
+}
+
+/**
+ * @brief Initialises DMA pherip and channel used by LCD
+ * @param[in]: _dma_periph: DMAx(x=0,1)
+ * @param[in]: _channel: specify which DMA channel is initialized only one parameter can be selected => 
+ * 				DMA0: DMA_CHx(x=0..6), DMA1: DMA_CHx(x=0..4)
+ * @param[in]: _spi_periph: SPIx(x=0,1,2).
+ */
+static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _spi_perpih){
+	
+	rcu_periph_clock_enable(RCU_DMA0);
+
+	dma_periph = _dma_periph;
+	dma_channel = _channel;
+	dma_channel_disable(dma_periph, dma_channel);
+	/**
+	 * Initilise dma parameters
+	 */
+	dma_parameter_struct dma_init_struct;
+	dma_struct_para_init(&dma_init_struct);
+
+	dma_init_struct.direction = DMA_MEMORY_TO_PERIPHERAL; 	
+	dma_init_struct.memory_addr = (uint32_t)&dma_data; 
+	dma_init_struct.memory_inc = DMA_MEMORY_INCREASE_DISABLE; 
+	dma_init_struct.memory_width = DMA_MEMORY_WIDTH_16BIT; 			//Buffer 16 bits of data / transfer
+	//dma_init_struct.number = (LCD_X_MAX * LCD_Y_MAX); 				//2 bytes per pixel. There are 240x240 pixels
+	dma_init_struct.number = 0;
+	dma_init_struct.periph_addr = (uint32_t)((_spi_perpih) + 0x0CU);
+	dma_init_struct.periph_inc = DMA_PERIPH_INCREASE_DISABLE; 		
+	dma_init_struct.periph_width = DMA_PERIPHERAL_WIDTH_16BIT; 		//SPIx 16 bit data
+	dma_init_struct.priority = DMA_PRIORITY_HIGH;					//Priority
+	
+	dma_init(dma_periph, dma_channel, &dma_init_struct);
+	
+	//Interrup config
+	//dma_interrupt_flag_clear(dma_periph, dma_channel, DMA_INT_FTF);
+	//dma_interrupt_enable(dma_periph, dma_channel, DMA_INT_FTF); 
+	//eclic_irq_enable(DMA0_Channel2_IRQn, 1, 1);
+	//eclic_priority_group_set(ECLIC_PRIGROUP_LEVEL3_PRIO1); 
+}
+
+static void dma_lcd_wr(const dma_spi_data_t data){
+	while(((dma_head + 1) & (DMA_BUFFER_SIZE - 1)) == dma_tail) dma_buffer_flush(); //Flush buff if FULL (OBS BLOCKING!)
+	dma_buffer[dma_head] = data;								//Add data to buffer
+	dma_head = (dma_head + 1) & (DMA_BUFFER_SIZE - 1);
+}
+
+/**
+ * @brief Write LCD command
+ * @param[in]: payload: Data to be transmitted
+ */
+static void dma_lcd_wr_cmd(const cmd payload){
+	dma_spi_data_t _data = {1, 0, (0x00FF & (payload)) };
+	dma_lcd_wr(_data);
+}
+
+/**
+ * @brief Write LCD data
+ * @param[in]: payload: Data to be transmitted
+ * @param[in]: amount: How many bytes to send (each DMA tx is 2 bytes)
+ */
+static void dma_lcd_wr_data(const uint16_t payload, const uint32_t amount){
+	dma_spi_data_t _data = {amount , 1, payload};
+	dma_lcd_wr(_data);
+}
+
+//DMA functions end 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//SPI functions begin
 
 /**
  * @brief initialises LCD. OBS
- * \param[in]: spi_periph: SPIx(x=0,1,2)
- * \param[in]: gpio_periph: GPIOx(x = A,B,C,D,E). OBS! Once chosen, base all GPIO pins on input param!
- * \param[in]: clk: SPI clock pin
- * \param[in]: din: SPI data out (MOSI)
- * \param[in]: rst: Reset => GPIO_PIN_x(x=0..15) 
- * \param[in]: cs: Chip select => GPIO_PIN_x(x=0..15)
- * \param[in]: dc: Data or cmd => GPIO_PIN_x(x=0..15)
+ * @param[in]: spi_periph: SPIx(x=0,1,2)
+ * @param[in]: _dma_periph: DMAx(x=0,1)
+ * @param[in]: _channel: specify which DMA channel is initialized only one parameter can be selected => DMA0: DMA_CHx(x=0..6), DMA1: DMA_CHx(x=0..4)
+ * @param[in]: gpio_periph: GPIOx(x = A,B,C,D,E). OBS! Once chosen, base all GPIO pins on input param!
+ * @param[in]: clk: SPI clock pin
+ * @param[in]: din: SPI data out (MOSI)
+ * @param[in]: rst: Reset => GPIO_PIN_x(x=0..15) 
+ * @param[in]: cs: Chip select => GPIO_PIN_x(x=0..15)
+ * @param[in]: dc: Data or cmd => GPIO_PIN_x(x=0..15)
  */
-void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32_t _din, uint32_t _rst, uint32_t _cs, uint32_t _dc){
+void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _gpio_perpih, uint32_t _clk, uint32_t _din, uint32_t _rst, uint32_t _cs, uint32_t _dc){
 	spi_perpih = _spi_perpih;
 	gpio_perpih = _gpio_perpih;
 	rst = _rst;
 	cs = _cs;
 	dc = _dc;
+
+	lcd_dma_init(_dma_periph, _channel, spi_perpih);
 
 	/**
 	 * Init RCU for SPI and GPIO
@@ -206,150 +356,78 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _gpio_perpih, uint32_t _clk, uint32
 	spi_struct_para_init(&spi_param);
 	spi_param.device_mode = SPI_MASTER;
 	spi_param.trans_mode = SPI_TRANSMODE_BDTRANSMIT;
-	spi_param.frame_size = SPI_FRAMESIZE_8BIT;
+	spi_param.frame_size = SPI_FRAMESIZE_16BIT;
 	spi_param.nss = SPI_NSS_SOFT;
 	spi_param.endian = SPI_ENDIAN_MSB;
 	spi_param.clock_polarity_phase= SPI_CK_PL_LOW_PH_1EDGE;
 	spi_param.prescale = SPI_PSC_4;	//TODO: Change later to higher!
 
+	//spi_i2s_deinit(spi_perpih);         // Rensar SPI-register
+	//spi_disable(spi_perpih);            // Se till att den är helt avslagen
+
+
 	//Init spi
 	spi_init(spi_perpih, &spi_param);
+	//Enable DMA data transfers
+	spi_dma_enable(spi_perpih, SPI_DMA_TRANSMIT);
+	//Enable global interrups
+	//eclic_global_interrupt_enable(); 
 	
 	/**
 	 * Enable SPI
 	 */
 	spi_enable(spi_perpih);
 
+	//delay_ms(40+130+130); //Delay to make work
+
+	
 	//HW reset (Reset low for 10-20ms)
 	gpio_bit_reset(gpio_perpih, rst);
 	delay_ms(40);
 	gpio_bit_set(gpio_perpih, rst);
 
+	
 	//SW reset (CMD: 0x01, wait 120ms)
-	lcd_wr_cmd(SWRESET);
-	lcd_queue_flush_blocking();
+	dma_lcd_wr_cmd(SWRESET);
+	dma_buffer_flush_blocking();
 	delay_ms(130);
 
 	//Sleep out
-	lcd_wr_cmd(SLPOUT);
-	lcd_queue_flush_blocking();
+	dma_lcd_wr_cmd(SLPOUT);
+	dma_buffer_flush_blocking();
 	delay_ms(130);
 
 	//Pixel format (0x3A + data(0x55) RGB16bit)
-	lcd_wr_cmd(COLMOD);
-	lcd_wr_data(0x55);
+	dma_lcd_wr_cmd(COLMOD);
+	dma_lcd_wr_data(0x5500,1);
 
-	lcd_wr_cmd(INVON);
+	dma_lcd_wr_cmd(INVON);
 
-	lcd_wr_cmd(MADCTL);
-	lcd_wr_data(0xA0);
+	dma_lcd_wr_cmd(MADCTL);
+	dma_lcd_wr_data(0xA000,1);
 
 	lcd_clear(WHITE);
+	dma_buffer_flush_blocking();
 
-	lcd_wr_cmd(DISPON);
-	//Write data
-	lcd_queue_flush_blocking();
+	dma_lcd_wr_cmd(DISPON);
+
+	dma_buffer_flush_blocking();
+	
 }
+
+//SPI functions ends
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//LCD functions begin
 
 /**
  * @brief Clears LCD screen
  * @param[in]: color: Specifies the color of the screen to be cleared to
  */
 void lcd_clear(color color){
-	setWindow(0, LCD_X_MAX, 0, LCD_Y_MAX);
-	for(int i = 0; i < LCD_X_MAX * LCD_Y_MAX; i++){
-	 	lcd_wr_data(((uint16_t)color >> 8) & 0xFF);  	// High byte
-		lcd_wr_data((uint16_t)color & 0xFF);  			// Low byte
-	}
+	setWindow(0, LCD_X_MAX - 1, 0, LCD_Y_MAX - 1);
+	fillWindow(0, LCD_X_MAX - 1, 0, LCD_Y_MAX - 1, color);
 	curr_backgr = color;
 }
-
-/**
- * \brief Queue for LCD. Call first in superloop
- */
-void lcd_queue_flush(void){
-	//Prev_type indicate if needed to toggle DC 
-	static uint8_t prev_type = 0;
-
-	if( head != tail ){												//Buffer is NOT empty!
-		//If same type and SPI buffer ready for data
-		if( buff[tail].type == prev_type && spi_i2s_flag_get(spi_perpih, SPI_FLAG_TBE) == SET ){
-			cs_clr();
-			spi_i2s_data_transmit(spi_perpih, buff[tail].data); 	//Send data
-			tail = (tail + 1) & (BUFF_SIZE - 1);					//Increment and wrap tail
-		//Different types, then wait for SPI to finish tx b.f toggling DC
-		}else if( spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET ){
-			cs_clr();
-			buff[tail].type ? dc_set() : dc_clr();					//Data or cmd
-			prev_type = buff[tail].type;
-			spi_i2s_data_transmit(spi_perpih, buff[tail].data); 	//Send data
-			tail = (tail + 1) & (BUFF_SIZE - 1);					//Increment and wrap tail
-		}
-	
-	}else{
-		if(  spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET ) cs_set();
-	}	
-}
-
-/**
- * @brief Function used by initialisation of LCD. Blocking
- */
-static void lcd_queue_flush_blocking(void){
-    static uint8_t prev_type = 0;
-
-    while(head != tail){
-		//If same type and SPI buffer ready for data
-        if(buff[tail].type == prev_type && spi_i2s_flag_get(spi_perpih, SPI_FLAG_TBE) == SET){
-            cs_clr();
-            spi_i2s_data_transmit(spi_perpih, buff[tail].data);
-            tail = (tail + 1) & (BUFF_SIZE - 1);
-        }
-		//Different types, then wait for SPI to finish tx b.f toggling DC
-        else if(spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET){
-            cs_clr();
-            buff[tail].type ? dc_set() : dc_clr();
-            prev_type = buff[tail].type;
-            spi_i2s_data_transmit(spi_perpih, buff[tail].data);
-            tail = (tail + 1) & (BUFF_SIZE - 1);
-        }
-        //Wait until spi ready
-    }
-
-    
-    while(spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) != RESET);
-    cs_set();
-}
-
-/**
- * @brief Writes data to SPI buffer to be sent
- * @param[in] data: Data to be written by SPI
- */
-static void lcd_wr(const spi_data data){
-	while(((head + 1) & (BUFF_SIZE - 1)) == tail) lcd_queue_flush(); //Flush buff if FULL
-	buff[head] = data;								//Add data to buffer
-	head = (head + 1) & (BUFF_SIZE - 1);			//Inrement and wrap head. (BUFF_SIZE - 1 = bitmask of 1's)
-}
-
-/**
- * @brief Write LCD command
- * @param[in]: Data to be transmitted
- */
-static void lcd_wr_cmd(const cmd data){
-	spi_data _data = {0, (uint8_t)data};
-	lcd_wr(_data);
-}
-
-/**
- * @brief Write LCD data
- * @param[in]: Data to be transmitted
- */
-static void lcd_wr_data(const uint8_t data){
-	spi_data _data = {1, data};
-	lcd_wr(_data);
-}
-//SPI functions ends
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//LCD functions begin
 
 /**
  * @brief Sets a new window
@@ -367,19 +445,15 @@ static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, c
 		Y_OFFSET = 0;
 	}
 
-	lcd_wr_cmd(CASET);
-	lcd_wr_data(((xs + X_OFFSET) >> 8 ) & 0xFF);
-	lcd_wr_data((xs + X_OFFSET) & 0xFF);
-	lcd_wr_data(((xe + X_OFFSET) >> 8) & 0xFF);
-	lcd_wr_data((xe + X_OFFSET) & 0xFF);
+	dma_lcd_wr_cmd(CASET);
+	dma_lcd_wr_data( xs + X_OFFSET, 1);
+	dma_lcd_wr_data( xe + X_OFFSET, 1);
 
-	lcd_wr_cmd(RASET);
-	lcd_wr_data(((ys + Y_OFFSET) >> 8) & 0xFF);
-	lcd_wr_data((ys + Y_OFFSET) & 0xFF);
-	lcd_wr_data(((ye + Y_OFFSET) >> 8) & 0xFF);
-	lcd_wr_data((ye + Y_OFFSET) & 0xFF);
+	dma_lcd_wr_cmd(RASET);
+	dma_lcd_wr_data( ys + Y_OFFSET, 1);
+	dma_lcd_wr_data( ye + Y_OFFSET, 1);
 	//RAMWR
-	lcd_wr_cmd(RAMWR);
+	dma_lcd_wr_cmd(RAMWR);
 }
 
 /**
@@ -391,14 +465,12 @@ static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, c
  * @param[in] color: Color to be filled
  */
 static void fillWindow(const uint16_t xs, uint16_t xe, const uint16_t ys, uint16_t ye, color color){
-	lcd_wr_cmd(RAMWR);       							// RAMWR (start writing to RAM)
+	dma_lcd_wr_cmd(RAMWR);       						// RAMWR (start writing to RAM)
 	(xe = (xe > 240 ? LCD_X_MAX : xe));					//Make sure end coordinates is within range
 	(ye = (ye > 240 ? LCD_Y_MAX : ye));
 	uint16_t dx = xe - xs + 1, dy = ye - ys + 1;
-	for (int i = 0; i < dx*dy; i++) {
-		lcd_wr_data(((uint16_t)color >> 8) & 0xFF);  	// High byte
-		lcd_wr_data((uint16_t)color & 0xFF);  			// Low byte
-	}
+
+	dma_lcd_wr_data(color, dx*dy);
 }
 
 /**
@@ -409,8 +481,7 @@ static void fillWindow(const uint16_t xs, uint16_t xe, const uint16_t ys, uint16
  */
 void lcd_drawPixel(const uint16_t x, const uint16_t y, color color){
 	setWindow(x, x, y, y);
-	lcd_wr_data(((uint16_t)color >> 8) & 0xFF);
-	lcd_wr_data((uint16_t)color & 0xFF);
+	dma_lcd_wr_data(color, 1);
 }
 
 /**
@@ -436,8 +507,7 @@ void lcd_drawLine(uint16_t xs, uint16_t xe, uint16_t ys, uint16_t ye, color colo
 		 if (ys > ye) { uint16_t tmp = ys; ys = ye; ye = tmp; }
 		 setWindow(xs, xs, ys, ye);
 		 for (uint16_t y = ys; y <= ye; y++) {
-			lcd_wr_data(color >> 8);
-			lcd_wr_data(color & 0xFF);
+			dma_lcd_wr_data(color,1);
 		}
 		return;
 	}
@@ -447,8 +517,7 @@ void lcd_drawLine(uint16_t xs, uint16_t xe, uint16_t ys, uint16_t ye, color colo
 		if (xs > xe) { uint16_t tmp = xs; xs = xe; xe = tmp; }
 		setWindow(xs, xe, ys, ys);
 		for (uint16_t x = xs; x <= xe; x++) {
-			lcd_wr_data(color >> 8);
-			lcd_wr_data(color & 0xFF);
+			dma_lcd_wr_data(color,1);
 		}
 		return;
 	}
@@ -513,6 +582,10 @@ void lcd_drawCircle(uint16_t xs, uint16_t ys, uint16_t r, color color){
 	int16_t x = 0;
     int16_t y = r;
     int16_t d = 1 - r; 
+	
+	if( xs < r ) xs = r;
+	if( ys < r) ys = r;
+
 
     while (x <= y) {
         //Draw symmetric points in all eight octants
@@ -576,13 +649,12 @@ void lcd_drawCircle_filled(uint16_t xs, uint16_t ys, uint16_t r, color color){
  * @param[in]: _color: Color of Character
  * @param[in]: size: Size of Character
  */
-void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, const color _color, const font_size size){
+void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, const color _color){
 	//Select font
-	uint8_t var_y;
-	uint8_t *font_type;
-	if( size == SMALL){};
-	if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal; }
-	if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
+	uint8_t var_y = STD_FONT_Y_SIZE;
+	uint8_t *font_type = arial;
+	//if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal; }
+	//if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
 	int offset = (var_y << 1) * (ch - ' ');
 
 	//Set window size
@@ -595,8 +667,7 @@ void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, const co
 		for(int8_t j = 7; j >= 0; j--){
 			//Check each bit of each element. If 0b1 => Write new col, else keep current background color
 			color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
-			lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
-			lcd_wr_data(set_color & 0xFF);  				// Low byte
+			dma_lcd_wr_data(set_color,1);
 		}
 	}
 }
@@ -609,13 +680,13 @@ void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, const co
  * @param[in]: _color: Color of Characters
  * @param[in]: size: Size of Characters
  */
-void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const color _color, const font_size size){
+void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const color _color){
 	//Select font
-	uint8_t var_y;
-	uint8_t *font_type;
-	if( size == SMALL){};
-	if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
-	if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
+	uint8_t var_y = STD_FONT_Y_SIZE;
+	uint8_t *font_type = arial;
+	//if( size == SMALL){};
+	//if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
+	//if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
 
 	uint8_t ind = 0;
 	//Loop until NULL
@@ -632,8 +703,10 @@ void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const
 			for(int8_t j = 7; j >= 0; j--){
 				//Check each bit of each element. If 0b1 => Write new col, else keep current background color
 				color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
-				lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
-				lcd_wr_data(set_color & 0xFF);  				// Low byte
+				//lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
+				//lcd_wr_data(set_color & 0xFF);  				// Low byte
+				dma_lcd_wr_data(set_color,1);
+
 			}
 		}
 		ind++;		//Increment index var
@@ -648,19 +721,19 @@ void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const
  * @param[in]: _color: Color of val
  * @param[in]: size: Size of val
  */
-void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _color, const font_size size){
+void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _color){
 
 	if (val == 0) {
-    lcd_ShowCh(xs, ys,'0', _color, size);
+    lcd_ShowCh(xs, ys,'0', _color);
     return;
 	}
 
 	//Select font
-	uint8_t var_y;
-	uint8_t *font_type;
-	if( size == SMALL){};
-	if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
-	if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
+	uint8_t var_y = STD_FONT_Y_SIZE;
+	uint8_t *font_type = arial;
+	//if( size == SMALL){};
+	//if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
+	//if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
 
 	long BASE = 100000000;
 	uint8_t ind = 0;
@@ -683,8 +756,9 @@ void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _col
 			for(int8_t j = 7; j >= 0; j--){
 				//Check each bit of each element. If 0b1 => Write new col, else keep current background color
 				color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
-				lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
-				lcd_wr_data(set_color & 0xFF);  				// Low byte
+				//lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
+				//lcd_wr_data(set_color & 0xFF);  				// Low byte
+				dma_lcd_wr_data(set_color,1);
 			}
 		}
 		ind++;		//Increment index var
@@ -700,7 +774,7 @@ void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _col
  * @param[in]: _color: Color of val
  * @param[in]: size: Size of val
  */
-void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, uint8_t decim_pt, const color _color, const font_size size){
+void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, uint8_t decim_pt, const color _color){
 
 	//int decimal_points = 10 * 100000000;
 	//Integral
@@ -710,16 +784,16 @@ void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, ui
 	int decimal_val = (val - integral_val) * 100000000;			//Get decimal part of val
 	
     if (val == 0) {
-    lcd_ShowCh(xs, ys,'0', _color, size);
+    lcd_ShowCh(xs, ys,'0', _color);
     return;
 	}
 
 	//Select font
-	uint8_t var_y;
-	uint8_t *font_type;
-	if( size == SMALL){};
-	if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
-	if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
+	uint8_t var_y = STD_FONT_Y_SIZE;
+	uint8_t *font_type = arial;
+	//if( size == SMALL){};
+	//if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
+	//if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
 
 	long BASE = 100000000;
 	uint8_t ind = 0;
@@ -741,15 +815,14 @@ void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, ui
 			for(int8_t j = 7; j >= 0; j--){
 				//Check each bit of each element. If 0b1 => Write new col, else keep current background color
 				color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
-				lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
-				lcd_wr_data(set_color & 0xFF);  				// Low byte
+				dma_lcd_wr_data(set_color, 1);
 			}
 		}
 		ind++;		//Increment index var
 	}
 
 	//Decimal point
-	lcd_ShowCh(xs + (STD_FONT_X_SIZE * ind ), ys, '.', _color, size);
+	lcd_ShowCh(xs + (STD_FONT_X_SIZE * ind ), ys, '.', _color);
 	ind++;
 
 
@@ -775,8 +848,7 @@ void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, ui
 			for(int8_t j = 7; j >= 0; j--){
 				//Check each bit of each element. If 0b1 => Write new col, else keep current background color
 				color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
-				lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
-				lcd_wr_data(set_color & 0xFF);  				// Low byte
+				dma_lcd_wr_data(set_color, 1);
 			}
 		}
 		ind++;		//Increment index var
@@ -801,15 +873,16 @@ void lcd_showPicture(uint8_t *bitMap){
 
             color set_color = (bit == 1) ? BLACK : WHITE;
 
-            lcd_wr_data((set_color >> 8) & 0xFF);  		// High byte
-            lcd_wr_data(set_color & 0xFF);         		// Low byte
+           // lcd_wr_data((set_color >> 8) & 0xFF);  		// High byte
+            //lcd_wr_data(set_color & 0xFF);         		// Low byte
+			dma_lcd_wr_data(set_color, 1);
         }
     }
 }
 
 //LCD functions ends
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Auxillary
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//Auxillary functions
 /**
  * @brief Delays (blocking)
  * @param[in] ms: Amount of ms to delay
@@ -818,4 +891,19 @@ static void delay_ms(uint16_t ms){
 	volatile long long base = 7200; 	//Base
 	base = base*(long long)ms;			//Mult base with ms
 	while(--base) __asm__ volatile("nop");
+}
+static inline void dc_set(void) {
+    gpio_bit_set(gpio_perpih, dc);
+}
+
+static inline void dc_clr(void) {
+    gpio_bit_reset(gpio_perpih, dc);
+}
+
+static inline void cs_set(void) {
+    gpio_bit_set(gpio_perpih, cs);
+}
+
+static inline void cs_clr(void) {
+    gpio_bit_reset(gpio_perpih, cs);
 }

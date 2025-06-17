@@ -1,8 +1,8 @@
 ## Driver for ST7789VW LCD on GD32VF103
 
-Driver for SKU22632 LCD Breakout board on a 1.3" 240x240 IPS LCD (ST7789VW driver) using a GD32VF103 RISC-V microcontroller and SPI.
+Driver for SKU22632 LCD Breakout board on a 1.3" 240x240 IPS LCD (ST7789VW driver) using a GD32VF103 RISC-V microcontroller and SPI and DMA.
 
-The user can freely configure which SPI peripheral and GPIO pins are used for communication with the display.
+The user can freely configure which SPI, DMA peripheral and GPIO pins are used for communication with the display.
 
 ![image](https://github.com/user-attachments/assets/1bd5ee32-b214-4a39-9df6-e109f845d37e)
 
@@ -16,9 +16,9 @@ Change resolution on LCD by chaning the following constants in sku22632.h header
 ## 📌 Features
 
 - Supports 1-bit monochrome bitmaps (240x240)
-- User-configurable SPI interface and GPIOs
+- User-configurable SPI, DMA interface and GPIOs
 - Clear and easy to use API
-- Non-blocking 
+- Non-blocking DMA buffer for high speed applications
 - Uses hardware SPI and optimized screen writing
 
 ## 🖥️ Hardware
@@ -28,7 +28,7 @@ Change resolution on LCD by chaning the following constants in sku22632.h header
 | **MCU**             | GD32VF103 (RISC-V core)                |
 | **LCD Module**      | 1.3" 240x240 IPS LCD (SKU: 22632)      |
 | **Display Driver**  | ST7789VW                               |
-| **Interface**       | SPI                                    |
+| **Interface**       | SPI & DMA                              |
 | **Voltage**         | 3.3V or 5V compatible                  |
 
 ### 🔌 LCD Pinout & Connection
@@ -46,6 +46,21 @@ Below is a description of the LCD pinout for the SKU22632 1.3" 240x240 IPS displ
 | `VCC`   | Power        | Supply voltage. Accepts 3.3V or 5V.                        | ❌ No          |
 | `GND`   | Ground       | Ground connection.                                         | ❌ No          |
 
-> 💡 **Note:** All signal pins (`RST`, `DC`, `CS`, `CLK`, `DIN`) are **selectable** when initializing lcd. Please make sure that choosen SPI pheripheral and SPI pins (CLK & DIN) are correctly selected
+> 💡 **Note:** All signal pins (`RST`, `DC`, `CS`, `CLK`, `DIN`) are **selectable** when initializing lcd. Please make sure that chosen SPI, DMA pheripheral has compatible channels and SPI GPIO pins are correctly selected. An usable example is presented in the table below
 
 
+### ✅ Recommended Configuration for `lcd_init(...)`
+
+Use the example below to quickly get started
+
+| Argument       | Value        | Description                           |
+| -------------- | ------------ | ------------------------------------- |
+| `_spi_perpih`  | `SPI0`       | SPI peripheral used for data transfer |
+| `_dma_periph`  | `DMA0`       | DMA controller                        |
+| `_channel`     | `DMA_CH2`    | DMA channel mapped to `SPI0_TX`       |
+| `_gpio_perpih` | `GPIOA`      | GPIO port used for all signal pins    |
+| `_clk`         | `GPIO_PIN_5` | SPI0 clock pin (SCK)                  |
+| `_din`         | `GPIO_PIN_7` | SPI0 data out pin (MOSI)              |
+| `_rst`         | `GPIO_PIN_1` | LCD Reset pin                         |
+| `_cs`          | `GPIO_PIN_2` | LCD Chip Select pin                   |
+| `_dc`          | `GPIO_PIN_3` | LCD Data/Command pin                  |
