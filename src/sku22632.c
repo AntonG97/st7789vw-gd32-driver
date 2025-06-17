@@ -9,10 +9,6 @@ Libraries (other than vendor SDK and gcc libraries) must have .h-files in /lib/[
 #include "../include/sku22632.h"
 #include "../include/lcd_font.h"
 
-#define PI 3.14159265f
-//#include <math.h>
-
-
 typedef enum{
 	SWRESET = 0x01,	//SW reset
 	SLPIN = 0x10,	//LCD power saving mode
