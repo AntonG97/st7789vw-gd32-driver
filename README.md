@@ -55,7 +55,7 @@ Use the example below to quickly get started with a known working setup:
 
 ```c
 lcd_init(SPI0, DMA0, DMA_CH2, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
-
+```
 | Argument       | Value        | Description                           |
 | -------------- | ------------ | ------------------------------------- |
 | `_spi_perpih`  | `SPI0`       | SPI peripheral used for data transfer |
