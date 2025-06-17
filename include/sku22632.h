@@ -38,7 +38,6 @@ typedef enum {
     GBLUE        = 0x07FF
 }color;
 
-
 /**
  * @brief initialises LCD. OBS
  * @param[in]: spi_periph: SPIx(x=0,1,2)
@@ -53,14 +52,14 @@ typedef enum {
  */
 void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _gpio_perpih, uint32_t _clk, uint32_t _din, uint32_t _rst, uint32_t _cs, uint32_t _dc);
 /**
+ * @brief Place in beginning of superloop. Handles DMA queue
+ */
+void dma_buffer_flush(void);
+/**
  * @brief Clears LCD screen
  * @param[in]: color: Specifies the color of the screen to be cleared to
  */
 void lcd_clear(color color);
-/**
- * \brief Queue for LCD. Call first in superloop. Gets blocked if DMA transfer is active
- */
-void lcd_queue_flush(void);
 /**
  * @brief Draw single point
  * @param[in] x: col start coordinate [0 <= xs <= 240]
@@ -122,7 +121,7 @@ void lcd_drawCircle_filled(uint16_t xs, uint16_t ys, uint16_t r, color color);
  * @param[in]: _color: Color of Character
  * @param[in]: size: Size of Character
  */
-void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, color color, font_size size);
+void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, color color);
 /**
  * @brief Writes a string on LCD
  * @param[in]: xs: Center x coordinate
@@ -131,7 +130,7 @@ void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, color co
  * @param[in]: _color: Color of Characters
  * @param[in]: size: Size of Characters
  */
-void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const color _color, const font_size size);
+void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const color _color);
 /**
  * @brief Writes a number on LCD
  * @param[in]: xs: Center x coordinate
@@ -140,7 +139,7 @@ void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const
  * @param[in]: _color: Color of val
  * @param[in]: size: Size of val
  */
-void lcd_showNum(const uint16_t xs, const uint16_t ys, const int val, const color _color, const font_size size);
+void lcd_showNum(const uint16_t xs, const uint16_t ys, const int val, const color _color);
 /**
  * @brief Writes a float number on LCD
  * @param[in]: xs: Center x coordinate
@@ -150,17 +149,12 @@ void lcd_showNum(const uint16_t xs, const uint16_t ys, const int val, const colo
  * @param[in]: _color: Color of val
  * @param[in]: size: Size of val
  */
-void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, const uint8_t decim_pt, const color _color, const font_size size);
+void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, const uint8_t decim_pt, const color _color);
 /**
  * @brief Draws picture on LCD.
  * @param[in]: bitMap: Pointer to bitmap of 240x240 / 8 bytes
  */
 void lcd_showPicture(uint8_t *bitMap);
 //void lcd_showLogo();
-
-
-
-
-void lcd_dma_clear(color color);
 
 #endif
