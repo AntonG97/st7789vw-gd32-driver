@@ -64,3 +64,6 @@ Use the example below to quickly get started
 | `_rst`         | `GPIO_PIN_1` | LCD Reset pin                         |
 | `_cs`          | `GPIO_PIN_2` | LCD Chip Select pin                   |
 | `_dc`          | `GPIO_PIN_3` | LCD Data/Command pin                  |
+
+
+> **NOTE:** Font for ascii char provided by [text](http://www.rinkydinkelectronics.com/r_fonts.php#:~:text=All%20fonts%20on%20this%20page,any%20project%2C%20commercial%20or%20not)
