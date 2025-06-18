@@ -96,7 +96,8 @@ int main(void){
 
 	lcd_init(SPI0, DMA0, DMA_CH2, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
 
-	lcd_showStr(10,120,"Hello World!", RED);
+	lcd_showStr(30,120,"Hello World!", RED);
+	lcd_drawLine(30, 200, 134, 134, RED);
 	
 	while(1){
 		dma_buffer_flush();
