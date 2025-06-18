@@ -96,32 +96,7 @@ int main(void){
 
 	lcd_init(SPI0, DMA0, DMA_CH2, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
 
-	rcu_periph_clock_enable(RCU_GPIOB);
-	gpio_init(GPIOB, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_10);
-	gpio_bit_reset(GPIOB, GPIO_PIN_10);
-
-	setWindow(0,120,0,120);
-	fillWindow(0,120,0,120, RED);
-
-	lcd_drawPixel(150,150,RED);
-	lcd_drawPixel_big(170,170,RED);
-
-	lcd_drawLine(0,240,240,0,GREEN);
-
-	lcd_drawRec(50,100,50,100,BLACK);
-	lcd_drawRec_filled(50,100,50,100,GRAY);
-
-	lcd_drawCircle(120,120,20, GRED);
-	lcd_drawCircle_filled(120,120,18, MAGENTA);
-
-	lcd_ShowCh(150,150,'A', RED);
-	lcd_showStr(10,170,"FUCK", GREEN);
-
-	lcd_showNum(10,10,99, BLACK);
-
-	lcd_showNum_float(160,40,1000.7854,2, BLACK);
-
-	//lcd_showPicture(kub_map_v4);
+	lcd_showStr(10,120,"Hello World!", RED);
 	
 	while(1){
 		dma_buffer_flush();
@@ -245,7 +220,6 @@ static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32
 	dma_init_struct.memory_addr = (uint32_t)&dma_data; 
 	dma_init_struct.memory_inc = DMA_MEMORY_INCREASE_DISABLE; 
 	dma_init_struct.memory_width = DMA_MEMORY_WIDTH_16BIT; 			//Buffer 16 bits of data / transfer
-	//dma_init_struct.number = (LCD_X_MAX * LCD_Y_MAX); 				//2 bytes per pixel. There are 240x240 pixels
 	dma_init_struct.number = 0;
 	dma_init_struct.periph_addr = (uint32_t)((_spi_perpih) + 0x0CU);
 	dma_init_struct.periph_inc = DMA_PERIPH_INCREASE_DISABLE; 		
@@ -253,12 +227,6 @@ static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32
 	dma_init_struct.priority = DMA_PRIORITY_HIGH;					//Priority
 	
 	dma_init(dma_periph, dma_channel, &dma_init_struct);
-	
-	//Interrup config
-	//dma_interrupt_flag_clear(dma_periph, dma_channel, DMA_INT_FTF);
-	//dma_interrupt_enable(dma_periph, dma_channel, DMA_INT_FTF); 
-	//eclic_irq_enable(DMA0_Channel2_IRQn, 1, 1);
-	//eclic_priority_group_set(ECLIC_PRIGROUP_LEVEL3_PRIO1); 
 }
 
 static void dma_lcd_wr(const dma_spi_data_t data){
@@ -342,7 +310,6 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _chan
 	gpio_bit_set(gpio_perpih, cs);
 	//dc
 	gpio_init(gpio_perpih, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, dc);
-	//gpio_bit_set(gpio_perpih, dc);
 
 	/**
 	 * Init SPI As Master, 8 bit frame size, little endian and f = 27MHz
@@ -358,30 +325,20 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _chan
 	spi_param.clock_polarity_phase= SPI_CK_PL_LOW_PH_1EDGE;
 	spi_param.prescale = SPI_PSC_4;	//TODO: Change later to higher!
 
-	//spi_i2s_deinit(spi_perpih);         // Rensar SPI-register
-	//spi_disable(spi_perpih);            // Se till att den är helt avslagen
-
-
 	//Init spi
 	spi_init(spi_perpih, &spi_param);
 	//Enable DMA data transfers
 	spi_dma_enable(spi_perpih, SPI_DMA_TRANSMIT);
-	//Enable global interrups
-	//eclic_global_interrupt_enable(); 
-	
+
 	/**
 	 * Enable SPI
 	 */
 	spi_enable(spi_perpih);
 
-	//delay_ms(40+130+130); //Delay to make work
-
-	
 	//HW reset (Reset low for 10-20ms)
 	gpio_bit_reset(gpio_perpih, rst);
 	delay_ms(40);
 	gpio_bit_set(gpio_perpih, rst);
-
 	
 	//SW reset (CMD: 0x01, wait 120ms)
 	dma_lcd_wr_cmd(SWRESET);
@@ -408,7 +365,6 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _chan
 	dma_lcd_wr_cmd(DISPON);
 
 	dma_buffer_flush_blocking();
-	
 }
 
 //SPI functions ends
@@ -582,7 +538,6 @@ void lcd_drawCircle(uint16_t xs, uint16_t ys, uint16_t r, color color){
 	if( xs < r ) xs = r;
 	if( ys < r) ys = r;
 
-
     while (x <= y) {
         //Draw symmetric points in all eight octants
         lcd_drawPixel(xs + x, ys + y, color);
@@ -619,12 +574,12 @@ void lcd_drawCircle_filled(uint16_t xs, uint16_t ys, uint16_t r, color color){
 	if( ys < r) ys = r;
 
     while (y >= x) {
-        // Ritar horisontella linjer mellan symmetriska punkter i alla oktanter
+		//Draw horizontal lines in all octants
 
-        lcd_drawLine(xs - x, xs + x, ys - y, ys - y, color); // Övre horisontella linje
-        lcd_drawLine(xs - x, xs + x, ys + y, ys + y, color); // Nedre horisontella linje
-        lcd_drawLine(xs - y, xs + y, ys - x, ys - x, color); // Övre horisontella linje (andra oktanter)
-        lcd_drawLine(xs - y, xs + y, ys + x, ys + x, color); // Nedre horisontella linje (andra oktanter)
+        lcd_drawLine(xs - x, xs + x, ys - y, ys - y, color); //Upper horizontal line
+        lcd_drawLine(xs - x, xs + x, ys + y, ys + y, color); //Lower horizontal line
+        lcd_drawLine(xs - y, xs + y, ys - x, ys - x, color); //Upper horizontal line (other octants)
+        lcd_drawLine(xs - y, xs + y, ys + x, ys + x, color); //Lower horizontal line (other octants)
 
         x++;
 
@@ -699,8 +654,6 @@ void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const
 			for(int8_t j = 7; j >= 0; j--){
 				//Check each bit of each element. If 0b1 => Write new col, else keep current background color
 				color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
-				//lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
-				//lcd_wr_data(set_color & 0xFF);  				// Low byte
 				dma_lcd_wr_data(set_color,1);
 
 			}
@@ -752,8 +705,6 @@ void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _col
 			for(int8_t j = 7; j >= 0; j--){
 				//Check each bit of each element. If 0b1 => Write new col, else keep current background color
 				color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
-				//lcd_wr_data((set_color >> 8) & 0xFF);  			// High byte
-				//lcd_wr_data(set_color & 0xFF);  				// Low byte
 				dma_lcd_wr_data(set_color,1);
 			}
 		}
@@ -869,8 +820,6 @@ void lcd_showPicture(uint8_t *bitMap){
 
             color set_color = (bit == 1) ? BLACK : WHITE;
 
-           // lcd_wr_data((set_color >> 8) & 0xFF);  		// High byte
-            //lcd_wr_data(set_color & 0xFF);         		// Low byte
 			dma_lcd_wr_data(set_color, 1);
         }
     }
