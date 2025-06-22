@@ -2,7 +2,7 @@
 #define SKU22632_H
 
 #include <stdint.h>
-#include "lcd_font.h"
+//#include "lcd_font.h"
 
 /**
  * x and y coordinates MAX. Change depending on needs
