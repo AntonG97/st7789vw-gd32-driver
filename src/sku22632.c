@@ -198,17 +198,16 @@ static color curr_backgr;
 
 int main(void){
 
-	//TODO: ShowNum_float is bugged when writing 10.xxx
-
 	lcd_init(SPI0, DMA0, DMA_CH2, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
 
 	lcd_showStr(30,120,"Hello World!", RED);
 	lcd_drawLine(30, 200, 134, 134, RED);
-	
+
 	while(1){
 		dma_buffer_flush();
 	}
 
+	
 	return 0;
 }
 
@@ -795,7 +794,7 @@ void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _col
 	uint8_t ind = 0;
 	while( (val / BASE) == 0 && BASE > 1) BASE /= 10;
 	
-	while( val > 0 && ind < 16 ){
+	while( BASE > 0 && ind < 16 ){
 		uint8_t curr_val = val / BASE;		//Get next MSB digit
 		val -= (curr_val * BASE);			//Subtract
 		BASE /= 10;							//Adjust base
@@ -830,39 +829,37 @@ void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _col
  */
 void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, uint8_t decim_pt, const color _color){
 
+    if (val == 0) {
+    lcd_ShowCh(xs, ys,'0', _color);
+    return;
+	}
+
 	//int decimal_points = 10 * 100000000;
 	//Integral
 	//.
 	//Decimal
 	int integral_val = val;										//Get integral part of val
 	int decimal_val = (val - integral_val) * 100000000;			//Get decimal part of val
-	
-    if (val == 0) {
-    lcd_ShowCh(xs, ys,'0', _color);
-    return;
-	}
 
 	//Select font
 	uint8_t var_y = STD_FONT_Y_SIZE;
 	uint8_t *font_type = arial;
-	//if( size == SMALL){};
-	//if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
-	//if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
 
 	long BASE = 100000000;
 	uint8_t ind = 0;
+
 	while( (integral_val / BASE) == 0 && BASE > 1) BASE /= 10;
-	while( integral_val > 0 && ind < 16 ){
+	while( BASE > 0 && ind < 16 ){
 		uint8_t curr_val = integral_val / BASE;		//Get next MSB digit
 		integral_val -= (curr_val * BASE);			//Subtract
 		BASE /= 10;									//Adjust base
 
-		int offset = (var_y << 1) * (curr_val + '0' - ' ');								//Get correct character
+		int offset = (var_y << 1) * (curr_val + '0' - ' ');						//Get correct character
 	
 		//Set window size
-		uint8_t x = xs - (STD_FONT_X_SIZE >> 1) + (STD_FONT_X_SIZE * ind);				//Calc leftmost corner...
+		uint8_t x = xs - (STD_FONT_X_SIZE >> 1) + (STD_FONT_X_SIZE * ind);		//Calc leftmost corner...
 		uint8_t y = ys - (var_y >> 1);							
-		setWindow(x, x + STD_FONT_X_SIZE - 1, y, y + var_y - 1);						//... and set window
+		setWindow(x, x + STD_FONT_X_SIZE - 1, y, y + var_y - 1);				//... and set window
 	
 		//Write char
 		for(uint8_t i = 0; i < (var_y << 1); i++){
@@ -879,10 +876,9 @@ void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, ui
 	lcd_ShowCh(xs + (STD_FONT_X_SIZE * ind ), ys, '.', _color);
 	ind++;
 
-
 	BASE = 100000000;
 	while( (decimal_val / BASE) == 0 && BASE > 1 ) BASE /= 10;
-	while( decimal_val > 0 && ind < 16 && decim_pt > 0){
+	while( BASE > 0 && ind < 16 && decim_pt > 0){
 
 		decim_pt--;
 
