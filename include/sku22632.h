@@ -2,12 +2,41 @@
 #define SKU22632_H
 
 #include <stdint.h>
+#include "gd32vf103.h"
 
 /**
  * x and y coordinates MAX. Change depending on needs
  */
 #define LCD_X_MAX 240
 #define LCD_Y_MAX 240
+
+
+/**
+ * @brief Struct for GPIOx pins
+ * @param gpio_periph: GPIOx(x = A,B,C,D,E)
+ * @param gpio_pin: GPIO_PIN_x(x=0..15) 
+ */
+typedef struct{
+	uint32_t gpio_periph;	/** GPIO pheripheral */
+	uint32_t gpio_pin;		/** GPIO pin number */
+}gpio_param_t;
+
+/**
+ * @brief initialises LCD. OBS
+ * @param[in]: spi_periph: SPIx(x=0,1,2)
+ * @param[in]: _dma_periph: DMAx(x=0,1)
+ * @param[in]: _channel: DMA0: DMA_CHx(x=0..6), DMA1: DMA_CHx(x=0..4)
+ **/
+typedef struct{
+    uint32_t _spi_periph;           /* SPIx pheripheral base adress */
+    uint32_t _dma_periph;           /* DMAx pheripheral base adess */
+    dma_channel_enum _dma_channel;  /* DMAx channel*/
+	gpio_param_t _clk;              /* SPIx clock */
+	gpio_param_t _din;              /* SPIx DIN (MOSI) */
+    gpio_param_t _rst;              /* LCD reset. Active LOW*/
+    gpio_param_t _cs;               /* LCD chip select. Active LOW*/
+    gpio_param_t _dc;               /* LCD data/cmd select. LOW => Data | HIGH => cmd*/
+}lcd_param_init;
 
 /**
  * Bit patterns for RGB565 colors (5 bits red, 6 bits green, 5 bits blue)
@@ -39,17 +68,9 @@ typedef enum {
 
 /**
  * @brief initialises LCD. OBS
- * @param[in]: spi_periph: SPIx(x=0,1,2)
- * @param[in]: _dma_periph: DMAx(x=0,1)
- * @param[in]: _channel: specify which DMA channel is initialized only one parameter can be selected => DMA0: DMA_CHx(x=0..6), DMA1: DMA_CHx(x=0..4)
- * @param[in]: gpio_periph: GPIOx(x = A,B,C,D,E). OBS! Once chosen, base all GPIO pins on input param!
- * @param[in]: clk: SPI clock pin
- * @param[in]: din: SPI data out (MOSI)
- * @param[in]: rst: Reset => GPIO_PIN_x(x=0..15) 
- * @param[in]: cs: Chip select => GPIO_PIN_x(x=0..15)
- * @param[in]: dc: Data or cmd => GPIO_PIN_x(x=0..15)
+ * @param[in]: params: Pointer to struct containing initialization parameters
  */
-void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _gpio_perpih, uint32_t _clk, uint32_t _din, uint32_t _rst, uint32_t _cs, uint32_t _dc);
+void lcd_init(lcd_param_init *params);
 /**
  * @brief Place in beginning of superloop. Handles DMA queue
  */

@@ -5,7 +5,6 @@ If your main program should be assembly-language replace this file with main.S i
 Libraries (other than vendor SDK and gcc libraries) must have .h-files in /lib/[library name]/include/ and .c-files in /lib/[library name]/src/ to be included automatically.
 */
 
-#include "gd32vf103.h"
 #include "../include/sku22632.h"
 #include "../include/lcd_font.h"
 
@@ -139,14 +138,18 @@ uint8_t arial[4564] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x1E,0x08,0x3F,0xF8,0x3F,0xF8,0x20,0xF0,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,  // ~
 };
 
-//DMA
+/**
+ * DMA functions
+ */
 static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _spi_perpih);
 static void dma_lcd_wr(const dma_spi_data_t data);
 static void dma_lcd_wr_cmd(const cmd payload);
 static void dma_lcd_wr_data(const uint16_t payload, const uint32_t amount);
 static void dma_buffer_flush_blocking(void);
 
-//Auxillery functions
+/**
+ * Auxillary functions
+ */
 static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye);
 static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color);
 static void delay_ms(uint16_t ms);
@@ -156,39 +159,9 @@ static inline void cs_set(void);
 static inline void cs_clr(void);
 
 /**
- * SPI base
+ * Strcture to user defines params
  */
-static uint32_t spi_perpih;
-/**
- * DMA base
- */
-static uint32_t dma_periph;
-/**
- * DMA channel
- */
-static dma_channel_enum dma_channel;
-
-/**
- * GPIO base
- */
-static uint32_t gpio_perpih;
-
-/**
- * Reset GPIO pin. Active LOW.
- */
-static uint32_t rst;
-
-/**
- * Chip select GPIO pin. Active LOW. 
- */
-static uint32_t cs;
-
-/**
- * Data/Command selection GPIO pin. 
- * LOW => Cmd
- * HIGH => Data
- */
-static uint32_t dc;
+static lcd_param_init *sel_params;
 
 /**
  * Variable holds the current background color set during previous call of lcd_clear()
@@ -200,8 +173,32 @@ static color curr_backgr;
  */
 /*
 int main(void){
-
-	lcd_init(SPI0, DMA0, DMA_CH2, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
+		lcd_param_init lcd_params = {
+		._spi_periph    = SPI0,         // SPI0 peripheral base address
+		._dma_periph    = DMA0,         // DMA0 peripheral base address
+		._dma_channel   = DMA_CH2,      // DMA channel 2
+		._clk = {
+			.gpio_periph = GPIOA,       // GPIO port A
+			.gpio_pin    = GPIO_PIN_5,  // Pin 5 for clock
+		},
+		._din = {
+			.gpio_periph = GPIOA,
+			.gpio_pin    = GPIO_PIN_7,  // Pin 7 for MOSI (DIN)
+		},
+		._rst = {
+			.gpio_periph = GPIOA,
+			.gpio_pin    = GPIO_PIN_1,  // Pin 1 for reset
+		},
+		._cs = {
+			.gpio_periph = GPIOA,
+			.gpio_pin    = GPIO_PIN_2,  // Pin 2 for chip select
+		},
+		._dc = {
+			.gpio_periph = GPIOA,
+			.gpio_pin    = GPIO_PIN_3,  // Pin 3 for data/command select
+		},
+	};
+	lcd_init(&lcd_params);
 
 	lcd_showStr(30,120,"Hello World!", RED);
 	lcd_drawLine(30, 200, 134, 134, RED);
@@ -241,32 +238,32 @@ void dma_buffer_flush(void){
 	if( dma_head != dma_tail ){						//Buffer is NOT empty!
 
 		//If same type and SPI tx buffer ready for data!
-		if( dma_buffer[dma_tail].type == prev_type && spi_i2s_flag_get(spi_perpih, SPI_FLAG_TBE) == SET ){
+		if( dma_buffer[dma_tail].type == prev_type && spi_i2s_flag_get(sel_params->_spi_periph, SPI_FLAG_TBE) == SET ){
 			cs_clr();
-			dma_channel_disable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_channel_disable(sel_params->_dma_periph, sel_params->_dma_channel);	//Start DMA transfer
 			dma_data = dma_buffer[dma_tail].payload;
-			dma_transfer_number_config(dma_periph, dma_channel, dma_buffer[dma_tail].amount_trans);
+			dma_transfer_number_config(sel_params->_dma_periph, sel_params->_dma_channel, dma_buffer[dma_tail].amount_trans);
 
-			dma_channel_enable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_channel_enable(sel_params->_dma_periph, sel_params->_dma_channel);	//Start DMA transfer
 			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1);
 
 		//Different types and SPI has finished transmitting
-		}else if( dma_buffer[dma_tail].type != prev_type && spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET ){
+		}else if( dma_buffer[dma_tail].type != prev_type && spi_i2s_flag_get(sel_params->_spi_periph, SPI_FLAG_TRANS) == RESET ){
 			cs_clr();
-			dma_channel_disable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_channel_disable(sel_params->_dma_periph, sel_params->_dma_channel);	//Start DMA transfer
 			dma_data = dma_buffer[dma_tail].payload;
 			dma_buffer[dma_tail].type ? dc_set() : dc_clr();	//Data or cmd
 			prev_type = dma_buffer[dma_tail].type;
-			dma_transfer_number_config(dma_periph, dma_channel, dma_buffer[dma_tail].amount_trans);
+			dma_transfer_number_config(sel_params->_dma_periph, sel_params->_dma_channel, dma_buffer[dma_tail].amount_trans);
 
-			dma_channel_enable(dma_periph, dma_channel); 	//Start DMA transfer
+			dma_channel_enable(sel_params->_dma_periph, sel_params->_dma_channel); 	//Start DMA transfer
 			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1);
 		}
 
 	}else{
-		if( spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET ){
+		if( spi_i2s_flag_get(sel_params->_spi_periph, SPI_FLAG_TRANS) == RESET ){
 		cs_set();
-		dma_channel_disable(dma_periph, dma_channel);
+		dma_channel_disable(sel_params->_dma_periph, sel_params->_dma_channel);
 		}
 	}
 }
@@ -279,29 +276,29 @@ static void dma_buffer_flush_blocking(void){
     while( dma_head != dma_tail ){						//Buffer is NOT empty!
 
 		//If same type and SPI tx buffer ready for data!
-		if( dma_buffer[dma_tail].type == prev_type && spi_i2s_flag_get(spi_perpih, SPI_FLAG_TBE) == SET ){
+		if( dma_buffer[dma_tail].type == prev_type && spi_i2s_flag_get(sel_params->_spi_periph, SPI_FLAG_TBE) == SET ){
 			cs_clr();
-			dma_channel_disable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_channel_disable(sel_params->_dma_periph, sel_params->_dma_channel);	//Start DMA transfer
 			dma_data = dma_buffer[dma_tail].payload;
-			dma_transfer_number_config(dma_periph, dma_channel, dma_buffer[dma_tail].amount_trans);
+			dma_transfer_number_config(sel_params->_dma_periph, sel_params->_dma_channel, dma_buffer[dma_tail].amount_trans);
 
-			dma_channel_enable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_channel_enable(sel_params->_dma_periph, sel_params->_dma_channel);	//Start DMA transfer
 			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1);
 		//Different types and SPI has finished transmitting
-		}else if( dma_buffer[dma_tail].type != prev_type && spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) == RESET ){
+		}else if( dma_buffer[dma_tail].type != prev_type && spi_i2s_flag_get(sel_params->_spi_periph, SPI_FLAG_TRANS) == RESET ){
 			cs_clr();
-			dma_channel_disable(dma_periph, dma_channel);	//Start DMA transfer
+			dma_channel_disable(sel_params->_dma_periph, sel_params->_dma_channel);	//Start DMA transfer
 			dma_data = dma_buffer[dma_tail].payload;
 			dma_buffer[dma_tail].type ? dc_set() : dc_clr();	//Data or cmd
 			prev_type = dma_buffer[dma_tail].type;
-			dma_transfer_number_config(dma_periph, dma_channel, dma_buffer[dma_tail].amount_trans);
+			dma_transfer_number_config(sel_params->_dma_periph, sel_params->_dma_channel, dma_buffer[dma_tail].amount_trans);
 
-			dma_channel_enable(dma_periph, dma_channel); 	//Start DMA transfer
+			dma_channel_enable(sel_params->_dma_periph, sel_params->_dma_channel); 	//Start DMA transfer
 			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1);
 		}
 	}
 
-    while(spi_i2s_flag_get(spi_perpih, SPI_FLAG_TRANS) != RESET);
+    while(spi_i2s_flag_get(sel_params->_spi_periph, SPI_FLAG_TRANS) != RESET);
     cs_set();
 }
 
@@ -313,16 +310,17 @@ static void dma_buffer_flush_blocking(void){
  * @param[in]: _spi_periph: SPIx(x=0,1,2).
  */
 static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _spi_perpih){
+	sel_params->_dma_periph = _dma_periph;
+	sel_params->_dma_channel = _channel;
+	
 	//Activate DMAx RCU
-	if( _dma_periph == DMA0 ){
+	if(sel_params->_dma_periph == DMA0 ){
 		rcu_periph_clock_enable(RCU_DMA0);
 	}else{
 		rcu_periph_clock_enable(RCU_DMA1);
 	}
 
-	dma_periph = _dma_periph;
-	dma_channel = _channel;
-	dma_channel_disable(dma_periph, dma_channel);
+	dma_channel_disable(sel_params->_dma_periph, sel_params->_dma_channel);
 	/**
 	 * Initilise dma parameters
 	 */
@@ -339,7 +337,7 @@ static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32
 	dma_init_struct.periph_width = DMA_PERIPHERAL_WIDTH_16BIT; 		//SPIx 16 bit data
 	dma_init_struct.priority = DMA_PRIORITY_HIGH;					//Priority
 	
-	dma_init(dma_periph, dma_channel, &dma_init_struct);
+	dma_init(sel_params->_dma_periph, sel_params->_dma_channel, &dma_init_struct);
 }
 
 static void dma_lcd_wr(const dma_spi_data_t data){
@@ -373,36 +371,55 @@ static void dma_lcd_wr_data(const uint16_t payload, const uint32_t amount){
 
 /**
  * @brief initialises LCD. OBS
- * @param[in]: spi_periph: SPIx(x=0,1,2)
- * @param[in]: _dma_periph: DMAx(x=0,1)
- * @param[in]: _channel: specify which DMA channel is initialized only one parameter can be selected => DMA0: DMA_CHx(x=0..6), DMA1: DMA_CHx(x=0..4)
- * @param[in]: gpio_periph: GPIOx(x = A,B,C,D,E). OBS! Once chosen, base all GPIO pins on input param!
- * @param[in]: clk: SPI clock pin
- * @param[in]: din: SPI data out (MOSI)
- * @param[in]: rst: Reset => GPIO_PIN_x(x=0..15) 
- * @param[in]: cs: Chip select => GPIO_PIN_x(x=0..15)
- * @param[in]: dc: Data or cmd => GPIO_PIN_x(x=0..15)
+ * @param params: Pointer to struct containing initialization parameters
  */
-void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _gpio_perpih, uint32_t _clk, uint32_t _din, uint32_t _rst, uint32_t _cs, uint32_t _dc){
-	spi_perpih = _spi_perpih;
-	gpio_perpih = _gpio_perpih;
-	rst = _rst;
-	cs = _cs;
-	dc = _dc;
+void lcd_init(lcd_param_init *params){
+	sel_params = params;
 
-	lcd_dma_init(_dma_periph, _channel, spi_perpih);
+	lcd_dma_init(sel_params->_dma_periph, sel_params->_dma_channel, sel_params->_spi_periph);
 
 	/**
-	 * Init RCU for SPI and GPIO
+	 * Activate RCU for each GPIO
 	 */
-	switch(gpio_perpih){
+	switch(sel_params->_clk.gpio_periph){
 		case GPIOA: rcu_periph_clock_enable(RCU_GPIOA); break;
 		case GPIOB: rcu_periph_clock_enable(RCU_GPIOB); break;
 		case GPIOC: rcu_periph_clock_enable(RCU_GPIOC); break;
 		case GPIOD: rcu_periph_clock_enable(RCU_GPIOD); break;
 		case GPIOE: rcu_periph_clock_enable(RCU_GPIOE); break;
 	}
-	switch(spi_perpih){
+	switch(sel_params->_din.gpio_periph){
+		case GPIOA: rcu_periph_clock_enable(RCU_GPIOA); break;
+		case GPIOB: rcu_periph_clock_enable(RCU_GPIOB); break;
+		case GPIOC: rcu_periph_clock_enable(RCU_GPIOC); break;
+		case GPIOD: rcu_periph_clock_enable(RCU_GPIOD); break;
+		case GPIOE: rcu_periph_clock_enable(RCU_GPIOE); break;
+	}
+	switch(sel_params->_rst.gpio_periph){
+		case GPIOA: rcu_periph_clock_enable(RCU_GPIOA); break;
+		case GPIOB: rcu_periph_clock_enable(RCU_GPIOB); break;
+		case GPIOC: rcu_periph_clock_enable(RCU_GPIOC); break;
+		case GPIOD: rcu_periph_clock_enable(RCU_GPIOD); break;
+		case GPIOE: rcu_periph_clock_enable(RCU_GPIOE); break;
+	}
+	switch(sel_params->_cs.gpio_periph){
+		case GPIOA: rcu_periph_clock_enable(RCU_GPIOA); break;
+		case GPIOB: rcu_periph_clock_enable(RCU_GPIOB); break;
+		case GPIOC: rcu_periph_clock_enable(RCU_GPIOC); break;
+		case GPIOD: rcu_periph_clock_enable(RCU_GPIOD); break;
+		case GPIOE: rcu_periph_clock_enable(RCU_GPIOE); break;
+	}
+	switch(sel_params->_dc.gpio_periph){
+		case GPIOA: rcu_periph_clock_enable(RCU_GPIOA); break;
+		case GPIOB: rcu_periph_clock_enable(RCU_GPIOB); break;
+		case GPIOC: rcu_periph_clock_enable(RCU_GPIOC); break;
+		case GPIOD: rcu_periph_clock_enable(RCU_GPIOD); break;
+		case GPIOE: rcu_periph_clock_enable(RCU_GPIOE); break;
+	}
+	/**
+	 * Init RCU for SPI
+	 */
+	switch(sel_params->_spi_periph){
 		case SPI0: rcu_periph_clock_enable(RCU_SPI0); break;
 		case SPI1: rcu_periph_clock_enable(RCU_SPI1); break;
 		case SPI2: rcu_periph_clock_enable(RCU_SPI2); break;
@@ -412,17 +429,17 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _chan
 	 * Init GPIO
 	 */
 	//clk
-	gpio_init(gpio_perpih, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, _clk);
+	gpio_init(sel_params->_clk.gpio_periph, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, sel_params->_clk.gpio_pin);
 	//din (MOSI)
-	gpio_init(gpio_perpih, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, _din);
+	gpio_init(sel_params->_din.gpio_periph, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, sel_params->_din.gpio_pin);
 	//rst
-	gpio_init(gpio_perpih, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, rst);
-	gpio_bit_set(gpio_perpih, rst);
+	gpio_init(sel_params->_rst.gpio_periph, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, sel_params->_rst.gpio_pin);
+	gpio_bit_set(sel_params->_rst.gpio_periph, sel_params->_rst.gpio_pin);
 	//cs
-	gpio_init(gpio_perpih, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, cs);
-	gpio_bit_set(gpio_perpih, cs);
+	gpio_init(sel_params->_cs.gpio_periph, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, sel_params->_cs.gpio_pin);
+	gpio_bit_set(sel_params->_cs.gpio_periph, sel_params->_cs.gpio_pin);
 	//dc
-	gpio_init(gpio_perpih, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, dc);
+	gpio_init(sel_params->_dc.gpio_periph, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, sel_params->_dc.gpio_pin);
 
 	/**
 	 * Init SPI As Master, 8 bit frame size, little endian and f = 27MHz
@@ -439,19 +456,19 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _chan
 	spi_param.prescale = SPI_PSC_4;	
 
 	//Init spi
-	spi_init(spi_perpih, &spi_param);
+	spi_init(sel_params->_spi_periph, &spi_param);
 	//Enable DMA data transfers
-	spi_dma_enable(spi_perpih, SPI_DMA_TRANSMIT);
+	spi_dma_enable(sel_params->_spi_periph, SPI_DMA_TRANSMIT);
 
 	/**
 	 * Enable SPI
 	 */
-	spi_enable(spi_perpih);
+	spi_enable(sel_params->_spi_periph);
 
 	//HW reset (Reset low for 10-20ms)
-	gpio_bit_reset(gpio_perpih, rst);
+	gpio_bit_reset(sel_params->_rst.gpio_periph, sel_params->_rst.gpio_pin);
 	delay_ms(40);
-	gpio_bit_set(gpio_perpih, rst);
+	gpio_bit_set(sel_params->_rst.gpio_periph, sel_params->_rst.gpio_pin);
 	
 	//SW reset (CMD: 0x01, wait 120ms)
 	dma_lcd_wr_cmd(SWRESET);
@@ -950,17 +967,17 @@ static void delay_ms(uint16_t ms){
 	while(--base) __asm__ volatile("nop");
 }
 static inline void dc_set(void) {
-    gpio_bit_set(gpio_perpih, dc);
+    gpio_bit_set(sel_params->_dc.gpio_periph, sel_params->_dc.gpio_pin);
 }
 
 static inline void dc_clr(void) {
-    gpio_bit_reset(gpio_perpih, dc);
+    gpio_bit_reset(sel_params->_dc.gpio_periph, sel_params->_dc.gpio_pin);
 }
 
 static inline void cs_set(void) {
-    gpio_bit_set(gpio_perpih, cs);
+    gpio_bit_set(sel_params->_cs.gpio_periph, sel_params->_cs.gpio_pin);
 }
 
 static inline void cs_clr(void) {
-    gpio_bit_reset(gpio_perpih, cs);
+    gpio_bit_reset(sel_params->_cs.gpio_periph, sel_params->_cs.gpio_pin);
 }
