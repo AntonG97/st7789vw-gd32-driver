@@ -310,8 +310,12 @@ static void dma_buffer_flush_blocking(void){
  * @param[in]: _spi_periph: SPIx(x=0,1,2).
  */
 static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _spi_perpih){
-	
-	rcu_periph_clock_enable(RCU_DMA0);
+	//Activate DMAx RCU
+	if( _dma_periph == DMA0 ){
+		rcu_periph_clock_enable(RCU_DMA0);
+	}else{
+		rcu_periph_clock_enable(RCU_DMA1);
+	}
 
 	dma_periph = _dma_periph;
 	dma_channel = _channel;
@@ -429,7 +433,7 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _chan
 	spi_param.nss = SPI_NSS_SOFT;
 	spi_param.endian = SPI_ENDIAN_MSB;
 	spi_param.clock_polarity_phase= SPI_CK_PL_LOW_PH_1EDGE;
-	spi_param.prescale = SPI_PSC_4;	//TODO: Change later to higher!
+	spi_param.prescale = SPI_PSC_4;	
 
 	//Init spi
 	spi_init(spi_perpih, &spi_param);
@@ -460,6 +464,7 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _chan
 	dma_lcd_wr_cmd(COLMOD);
 	dma_lcd_wr_data(0x5500,1);
 
+	//Invert display
 	dma_lcd_wr_cmd(INVON);
 
 	dma_lcd_wr_cmd(MADCTL);
@@ -467,7 +472,8 @@ void lcd_init(uint32_t _spi_perpih, uint32_t _dma_periph, dma_channel_enum _chan
 
 	lcd_clear(WHITE);
 	dma_buffer_flush_blocking();
-
+	
+	//Turn on display
 	dma_lcd_wr_cmd(DISPON);
 
 	dma_buffer_flush_blocking();
