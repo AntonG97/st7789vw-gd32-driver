@@ -195,7 +195,10 @@ static uint32_t dc;
  */
 static color curr_backgr;
 
-
+/**
+ * INFO: This main gives an example on how to initilize the LCD and some few examples on how to use it
+ */
+/*
 int main(void){
 
 	lcd_init(SPI0, DMA0, DMA_CH2, GPIOA, GPIO_PIN_5, GPIO_PIN_7, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3);
@@ -210,7 +213,7 @@ int main(void){
 	
 	return 0;
 }
-
+*/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //DMA functions begin 
 #define DMA_BUFFER_SIZE 256
