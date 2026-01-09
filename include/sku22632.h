@@ -150,7 +150,7 @@ void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, color co
  * @param[in]: _color: Color of Characters
  * @param[in]: size: Size of Characters
  */
-void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const color _color);
+void lcd_showStr(const uint16_t xs, const uint16_t ys, const char *str, const color _color);
 /**
  * @brief Writes a number on LCD
  * @param[in]: xs: Center x coordinate

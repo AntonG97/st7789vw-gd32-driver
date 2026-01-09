@@ -620,7 +620,7 @@ void lcd_drawCircle_filled(uint16_t xs, uint16_t ys, uint16_t r, color color){
 void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, const color _color){
 	//Select font
 	uint8_t var_y = STD_FONT_Y_SIZE;
-	uint8_t *font_type = arial;
+	const uint8_t *font_type = arial;
 	//if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal; }
 	//if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
 	int offset = (var_y << 1) * (ch - ' ');
@@ -648,10 +648,10 @@ void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, const co
  * @param[in]: _color: Color of Characters
  * @param[in]: size: Size of Characters
  */
-void lcd_showStr(const uint16_t xs, const uint16_t ys, const uint8_t *str, const color _color){
+void lcd_showStr(const uint16_t xs, const uint16_t ys, const char *str, const color _color){
 	//Select font
 	uint8_t var_y = STD_FONT_Y_SIZE;
-	uint8_t *font_type = arial;
+	const uint8_t *font_type = arial;
 	//if( size == SMALL){};
 	//if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
 	//if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
@@ -696,7 +696,7 @@ void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _col
 
 	//Select font
 	uint8_t var_y = STD_FONT_Y_SIZE;
-	uint8_t *font_type = arial;
+	const uint8_t *font_type = arial;
 	//if( size == SMALL){};
 	//if( size == NORMAL) {var_y = STD_FONT_Y_SIZE; font_type = arial_normal;}
 	//if( size == BIG) {var_y = BIG_FONT_Y_SIZE; font_type = arial_big;}
@@ -754,7 +754,7 @@ void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, ui
 
 	//Select font
 	uint8_t var_y = STD_FONT_Y_SIZE;
-	uint8_t *font_type = arial;
+	const uint8_t *font_type = arial;
 
 	long BASE = 100000000;
 	uint8_t ind = 0;
