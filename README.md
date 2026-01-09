@@ -1,6 +1,6 @@
 ## Driver for ST7789VW LCD on GD32VF103
 
-Driver for SKU22632 LCD Breakout board on a 1.3" 240x240 IPS LCD (ST7789VW driver) using a GD32VF103 RISC-V microcontroller and SPI and DMA.
+Driver for SKU22632 LCD Breakout board on a 1.3" 240x240 IPS LCD (ST7789VW driver) using a GD32VF103 RISC-V microcontroller, SPI and DMA.
 
 The user can freely configure which SPI, DMA peripheral and GPIO pins are used for communication with the display.
 
@@ -12,6 +12,8 @@ Change resolution on LCD by chaning the following constants in sku22632.h header
 
 ![image](https://github.com/user-attachments/assets/2e9fd384-8f7a-4733-ad70-e98ed928888c)
 
+To build without main (If for example used in other project with a different main) include the build flag
+ ***-DLIB_NO_MAIN***
 
 ## 📌 Features
 
@@ -50,9 +52,6 @@ Below is a description of the LCD pinout for the SKU22632 1.3" 240x240 IPS displ
 
 
 ### ✅ Recommended Configuration for `lcd_init(...)`
-Sure! Here’s a full, clean English README section you can copy-paste directly into your README file:
-
----
 
 # LCD Initialization
 
