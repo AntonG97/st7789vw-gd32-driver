@@ -2,7 +2,7 @@
 
 Driver for SKU22632 LCD Breakout board on a 1.3" 240x240 IPS LCD (ST7789VW driver) using a GD32VF103 RISC-V microcontroller, SPI and DMA.
 
-The user can freely configure which SPI, DMA peripheral and GPIO pins are used for communication with the display
+The user can freely configure which SPI, DMA peripheral and GPIO pins are used for communication with the display!
 
 ![image](https://github.com/user-attachments/assets/1bd5ee32-b214-4a39-9df6-e109f845d37e)
 
