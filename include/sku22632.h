@@ -17,7 +17,7 @@
  * @param gpio_pin: GPIO_PIN_x(x=0..15) 
  */
 typedef struct{
-	uint32_t gpio_periph;	/** GPIO pheripheral */
+	uint32_t gpio_periph;	 	/** GPIO pheripheral */
 	uint32_t gpio_pin;		/** GPIO pin number */
 }gpio_param_t;
 
@@ -28,14 +28,14 @@ typedef struct{
  * @param[in]: _channel: DMA0: DMA_CHx(x=0..6), DMA1: DMA_CHx(x=0..4)
  **/
 typedef struct{
-    uint32_t _spi_periph;           /* SPIx pheripheral base adress */
-    uint32_t _dma_periph;           /* DMAx pheripheral base adess */
-    dma_channel_enum _dma_channel;  /* DMAx channel*/
+    	uint32_t _spi_periph;           /* SPIx pheripheral base adress */
+    	uint32_t _dma_periph;           /* DMAx pheripheral base adess */
+    	dma_channel_enum _dma_channel;  /* DMAx channel*/
 	gpio_param_t _clk;              /* SPIx clock */
 	gpio_param_t _din;              /* SPIx DIN (MOSI) */
-    gpio_param_t _rst;              /* LCD reset. Active LOW*/
-    gpio_param_t _cs;               /* LCD chip select. Active LOW*/
-    gpio_param_t _dc;               /* LCD data/cmd select. LOW => Data | HIGH => cmd*/
+    	gpio_param_t _rst;              /* LCD reset. Active LOW*/
+    	gpio_param_t _cs;               /* LCD chip select. Active LOW*/
+    	gpio_param_t _dc;               /* LCD data/cmd select. LOW => Data | HIGH => cmd*/
 }lcd_param_init;
 
 /**

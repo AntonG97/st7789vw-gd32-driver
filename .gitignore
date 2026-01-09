@@ -1,0 +1,6 @@
+/build/
+/compiler/
+/firmware/
+/lib/
+Makefile
+
