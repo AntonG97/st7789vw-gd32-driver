@@ -1,0 +1,66 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_OUTPUT_EXCMD	mixed	/number, pattern, mixed, or combineV2/
+!_TAG_OUTPUT_FILESEP	slash	/slash or backslash/
+!_TAG_OUTPUT_MODE	u-ctags	/u-ctags or e-ctags/
+!_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
+!_TAG_PROC_CWD	/home/angr/Documents/projects/diy_projects/gd32vf103/projects/lcd_st7789/	//
+!_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+!_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+!_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+!_TAG_PROGRAM_VERSION	5.9.0	//
+CASET	src/sku22632.c	/^	CASET = 0x2A,	\/\/Column adress set + 4 bytes of data$/;"	e	enum:__anon68fcfebf0103	file:
+COLMOD	src/sku22632.c	/^	COLMOD = 0x3A,	\/\/Interface pixel format$/;"	e	enum:__anon68fcfebf0103	file:
+DISPOFF	src/sku22632.c	/^	DISPOFF = 0x28,	\/\/Display OFF$/;"	e	enum:__anon68fcfebf0103	file:
+DISPON	src/sku22632.c	/^	DISPON = 0x29, 	\/\/Display ON$/;"	e	enum:__anon68fcfebf0103	file:
+DMA_BUFFER_SIZE	src/sku22632.c	/^#define DMA_BUFFER_SIZE /;"	d	file:
+GAMSET	src/sku22632.c	/^	GAMSET = 0x26,	\/\/Gamma set$/;"	e	enum:__anon68fcfebf0103	file:
+INVOFF	src/sku22632.c	/^	INVOFF = 0x20, 	\/\/Display inversion off$/;"	e	enum:__anon68fcfebf0103	file:
+INVON	src/sku22632.c	/^	INVON = 0x21,	\/\/Display inversion on$/;"	e	enum:__anon68fcfebf0103	file:
+MADCTL	src/sku22632.c	/^	MADCTL = 0x36,	\/\/Memory data access control$/;"	e	enum:__anon68fcfebf0103	file:
+NORON	src/sku22632.c	/^	NORON = 0x13,	\/\/Normal display mode on$/;"	e	enum:__anon68fcfebf0103	file:
+RAMWR	src/sku22632.c	/^	RAMWR = 0x2C, 	\/\/Memory write. Transfer data from MCU to frame mem. When cmd accepted, col an/;"	e	enum:__anon68fcfebf0103	file:
+RASET	src/sku22632.c	/^	RASET = 0x2B,	\/\/Row adress set + 4 bytes of data$/;"	e	enum:__anon68fcfebf0103	file:
+SLPIN	src/sku22632.c	/^	SLPIN = 0x10,	\/\/LCD power saving mode$/;"	e	enum:__anon68fcfebf0103	file:
+SLPOUT	src/sku22632.c	/^	SLPOUT = 0x11, 	\/\/LCD turn off power saving mode$/;"	e	enum:__anon68fcfebf0103	file:
+SWRESET	src/sku22632.c	/^	SWRESET = 0x01,	\/\/SW reset$/;"	e	enum:__anon68fcfebf0103	file:
+WRDISBV	src/sku22632.c	/^	WRDISBV = 0x51,	\/\/Write display brightness + 1 byte (0x00 => Lowest 0xFF => Highest)$/;"	e	enum:__anon68fcfebf0103	file:
+__anon68fcfebf0103	src/sku22632.c	/^typedef enum{$/;"	g	file:
+amount_trans	src/sku22632.c	/^	uint32_t amount_trans;		$/;"	m	struct:dma_frame_t	typeref:typename:uint32_t	file:
+cmd	src/sku22632.c	/^}cmd;$/;"	t	typeref:enum:__anon68fcfebf0103	file:
+cs_clr	src/sku22632.c	/^static inline void cs_clr(void) {$/;"	f	typeref:typename:void	file:
+cs_set	src/sku22632.c	/^static inline void cs_set(void) {$/;"	f	typeref:typename:void	file:
+curr_backgr	src/sku22632.c	/^static color curr_backgr;$/;"	v	typeref:typename:color	file:
+dc_clr	src/sku22632.c	/^static inline void dc_clr(void) {$/;"	f	typeref:typename:void	file:
+dc_set	src/sku22632.c	/^static inline void dc_set(void) {$/;"	f	typeref:typename:void	file:
+delay_ms	src/sku22632.c	/^static void delay_ms(uint16_t ms){$/;"	f	typeref:typename:void	file:
+dma_buffer	src/sku22632.c	/^static struct dma_frame_t dma_buffer[DMA_BUFFER_SIZE];$/;"	v	typeref:struct:dma_frame_t[]	file:
+dma_buffer_flush	src/sku22632.c	/^void dma_buffer_flush(void){$/;"	f	typeref:typename:void
+dma_buffer_flush_blocking	src/sku22632.c	/^static void dma_buffer_flush_blocking(void){$/;"	f	typeref:typename:void	file:
+dma_data	src/sku22632.c	/^static uint16_t dma_data;$/;"	v	typeref:typename:uint16_t	file:
+dma_frame_t	src/sku22632.c	/^struct dma_frame_t{$/;"	s	file:
+dma_head	src/sku22632.c	/^static int dma_head = 0, dma_tail = 0;$/;"	v	typeref:typename:int	file:
+dma_lcd_wr	src/sku22632.c	/^static void dma_lcd_wr(const struct dma_frame_t data){$/;"	f	typeref:typename:void	file:
+dma_lcd_wr_cmd	src/sku22632.c	/^static void dma_lcd_wr_cmd(const cmd payload){$/;"	f	typeref:typename:void	file:
+dma_lcd_wr_data	src/sku22632.c	/^static void dma_lcd_wr_data(const uint16_t payload, const uint32_t amount){$/;"	f	typeref:typename:void	file:
+dma_tail	src/sku22632.c	/^static int dma_head = 0, dma_tail = 0;$/;"	v	typeref:typename:int	file:
+fillWindow	src/sku22632.c	/^static void fillWindow(const uint16_t xs, uint16_t xe, const uint16_t ys, uint16_t ye, color col/;"	f	typeref:typename:void	file:
+lcd_ShowCh	src/sku22632.c	/^void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, const color _color){$/;"	f	typeref:typename:void
+lcd_clear	src/sku22632.c	/^void lcd_clear(color color){$/;"	f	typeref:typename:void
+lcd_dma_init	src/sku22632.c	/^static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _spi_perpih){$/;"	f	typeref:typename:void	file:
+lcd_drawCircle	src/sku22632.c	/^void lcd_drawCircle(uint16_t xs, uint16_t ys, uint16_t r, color color){$/;"	f	typeref:typename:void
+lcd_drawCircle_filled	src/sku22632.c	/^void lcd_drawCircle_filled(uint16_t xs, uint16_t ys, uint16_t r, color color){$/;"	f	typeref:typename:void
+lcd_drawLine	src/sku22632.c	/^void lcd_drawLine(uint16_t xs, uint16_t xe, uint16_t ys, uint16_t ye, color color){$/;"	f	typeref:typename:void
+lcd_drawPixel	src/sku22632.c	/^void lcd_drawPixel(const uint16_t x, const uint16_t y, color color){$/;"	f	typeref:typename:void
+lcd_drawPixel_big	src/sku22632.c	/^void lcd_drawPixel_big(const uint16_t x, const uint16_t y, color color){$/;"	f	typeref:typename:void
+lcd_drawRec	src/sku22632.c	/^void lcd_drawRec(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, col/;"	f	typeref:typename:void
+lcd_drawRec_filled	src/sku22632.c	/^void lcd_drawRec_filled(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t /;"	f	typeref:typename:void
+lcd_init	src/sku22632.c	/^void lcd_init(lcd_param_init *params){$/;"	f	typeref:typename:void
+lcd_showNum	src/sku22632.c	/^void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _color){$/;"	f	typeref:typename:void
+lcd_showNum_float	src/sku22632.c	/^void lcd_showNum_float(const uint16_t xs, const uint16_t ys, const float val, uint8_t decim_pt, /;"	f	typeref:typename:void
+lcd_showPicture	src/sku22632.c	/^void lcd_showPicture(uint8_t *bitMap){$/;"	f	typeref:typename:void
+main	src/sku22632.c	/^int main(void){$/;"	f	typeref:typename:int
+payload	src/sku22632.c	/^	uint16_t payload;					$/;"	m	struct:dma_frame_t	typeref:typename:uint16_t	file:
+sel_params	src/sku22632.c	/^static lcd_param_init *sel_params = '\\0';$/;"	v	typeref:typename:lcd_param_init *	file:
+setWindow	src/sku22632.c	/^static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye/;"	f	typeref:typename:void	file:
+type	src/sku22632.c	/^	uint8_t type;		$/;"	m	struct:dma_frame_t	typeref:typename:uint8_t	file:

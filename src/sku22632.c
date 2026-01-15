@@ -19,25 +19,29 @@ typedef enum{
 	WRDISBV = 0x51,	//Write display brightness + 1 byte (0x00 => Lowest 0xFF => Highest)
 }cmd;
 
-typedef struct{
-	uint32_t amount_trans;		//Amount of transfers
-	uint8_t type;			//LOW (0) => HIGH (1) => Data
-	uint16_t payload;					
-}dma_spi_data_t;
-
-
-/**
- * DMA functions
+/* DMA frame
+ * @amount_trans: How many bytes to send 
+ * @type: type of frame. 0 = CMD, 1 = DATA 
+ * @payload	
  */
+struct dma_frame_t{
+	uint32_t amount_trans;		
+	uint8_t type;		
+	uint16_t payload;					
+};
+
+/* =============================================================================================================================================================================
+*   DMA functions
+*  ============================================================================================================================================================================*/
 static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32_t _spi_perpih);
-static void dma_lcd_wr(const dma_spi_data_t data);
+static void dma_lcd_wr(const struct dma_frame_t data);
 static void dma_lcd_wr_cmd(const cmd payload);
 static void dma_lcd_wr_data(const uint16_t payload, const uint32_t amount);
 static void dma_buffer_flush_blocking(void);
 
-/**
- * Auxillary functions
- */
+/* =============================================================================================================================================================================
+*   Auxillary functions
+*  ============================================================================================================================================================================*/
 static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye);
 static void fillWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, const uint16_t ye, color color);
 static void delay_ms(uint16_t ms);
@@ -46,14 +50,10 @@ static inline void dc_clr(void);
 static inline void cs_set(void);
 static inline void cs_clr(void);
 
-/**
- * Strcture to user defines params
- */
-static lcd_param_init *sel_params;
+/* Pointer to an active LCD config */
+static lcd_param_init *sel_params = '\0';
 
-/**
- * Variable holds the current background color set during previous call of lcd_clear()
- */
+/* Current background color */
 static color curr_backgr;
 
 #ifndef LIB_NO_MAIN 
@@ -96,53 +96,47 @@ int main(void){
 	return 0;
 }
 #endif
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//DMA functions begin 
+
+/* =============================================================================================================================================================================
+*   DMA functions begin
+*  ============================================================================================================================================================================*/
 #define DMA_BUFFER_SIZE 256
-/**
- * DMA data buffer
- */
-static dma_spi_data_t dma_buffer[DMA_BUFFER_SIZE];
-/**
- * LCD data buffer. Fill with pixel value and let DMA transmit to SPI
- */
+
+/* DMA data buffer */
+static struct dma_frame_t dma_buffer[DMA_BUFFER_SIZE];
+
+/* LCD data buffer. Fill with pixel value and let DMA transmit to SPI */
 static uint16_t dma_data;
-/**
- * Variables used in DMA buffer logic
- */
+
+/* Variables used in DMA buffer logic */
 static int dma_head = 0, dma_tail = 0;
+
 /**
  * @brief Place in beginning of superloop. Handles DMA queue
  */
 void dma_buffer_flush(void){
-	/**
-	 * Variable is used to DMA ISR to correctly set GPIOx pins based on previous and current data to be transmitted
-	 */
+	/*  Variable is used to DMA ISR to correctly set GPIOx pins based on previous and current data to be transmitted */
 	static uint8_t prev_type = 0;
 
-	if( dma_head != dma_tail ){						//Buffer is NOT empty!
-
+	if( dma_head != dma_tail ){ //Buffer not empty
 		//If same type and SPI tx buffer ready for data!
 		if( dma_buffer[dma_tail].type == prev_type && spi_i2s_flag_get(sel_params->_spi_periph, SPI_FLAG_TBE) == SET ){
 			cs_clr();
-			dma_channel_disable(sel_params->_dma_periph, sel_params->_dma_channel);	//Start DMA transfer
+			dma_channel_disable(sel_params->_dma_periph, sel_params->_dma_channel);
 			dma_data = dma_buffer[dma_tail].payload;
 			dma_transfer_number_config(sel_params->_dma_periph, sel_params->_dma_channel, dma_buffer[dma_tail].amount_trans);
-
-			dma_channel_enable(sel_params->_dma_periph, sel_params->_dma_channel);	//Start DMA transfer
-			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1);
-
+			dma_channel_enable(sel_params->_dma_periph, sel_params->_dma_channel);
+			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1); //Modulus
 		//Different types and SPI has finished transmitting
 		}else if( dma_buffer[dma_tail].type != prev_type && spi_i2s_flag_get(sel_params->_spi_periph, SPI_FLAG_TRANS) == RESET ){
 			cs_clr();
-			dma_channel_disable(sel_params->_dma_periph, sel_params->_dma_channel);	//Start DMA transfer
+			dma_channel_disable(sel_params->_dma_periph, sel_params->_dma_channel);	
 			dma_data = dma_buffer[dma_tail].payload;
-			dma_buffer[dma_tail].type ? dc_set() : dc_clr();	//Data or cmd
+			dma_buffer[dma_tail].type ? dc_set() : dc_clr(); //DATA or CMD
 			prev_type = dma_buffer[dma_tail].type;
 			dma_transfer_number_config(sel_params->_dma_periph, sel_params->_dma_channel, dma_buffer[dma_tail].amount_trans);
-
-			dma_channel_enable(sel_params->_dma_periph, sel_params->_dma_channel); 	//Start DMA transfer
-			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1);
+			dma_channel_enable(sel_params->_dma_periph, sel_params->_dma_channel); 
+			dma_tail = (dma_tail + 1) & (DMA_BUFFER_SIZE - 1); //Modulus
 		}
 
 	}else{
@@ -225,7 +219,7 @@ static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32
 	dma_init(sel_params->_dma_periph, sel_params->_dma_channel, &dma_init_struct);
 }
 
-static void dma_lcd_wr(const dma_spi_data_t data){
+static void dma_lcd_wr(const struct dma_frame_t data){
 	while(((dma_head + 1) & (DMA_BUFFER_SIZE - 1)) == dma_tail) dma_buffer_flush(); //Flush buff if FULL (OBS BLOCKING!)
 	dma_buffer[dma_head] = data;								//Add data to buffer
 	dma_head = (dma_head + 1) & (DMA_BUFFER_SIZE - 1);
@@ -236,7 +230,7 @@ static void dma_lcd_wr(const dma_spi_data_t data){
  * @param[in]: payload: Data to be transmitted
  */
 static void dma_lcd_wr_cmd(const cmd payload){
-	dma_spi_data_t _data = {1, 0, (0x00FF & (payload)) };
+	struct dma_frame_t _data = {1, 0, (0x00FF & (payload)) };
 	dma_lcd_wr(_data);
 }
 
@@ -246,14 +240,18 @@ static void dma_lcd_wr_cmd(const cmd payload){
  * @param[in]: amount: How many bytes to send (each DMA tx is 2 bytes)
  */
 static void dma_lcd_wr_data(const uint16_t payload, const uint32_t amount){
-	dma_spi_data_t _data = {amount , 1, payload};
+	struct dma_frame_t _data = {amount , 1, payload};
 	dma_lcd_wr(_data);
 }
 
-//DMA functions end 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//SPI functions begin
+/* =============================================================================================================================================================================
+*   DMA functions end 
+*  ============================================================================================================================================================================*/
 
+
+/* =============================================================================================================================================================================
+*   SPI functions begin 
+*  ============================================================================================================================================================================*/
 /**
  * @brief initialises LCD. OBS
  * @param params: Pointer to struct containing initialization parameters
@@ -383,11 +381,13 @@ void lcd_init(lcd_param_init *params){
 
 	dma_buffer_flush_blocking();
 }
+/* =============================================================================================================================================================================
+*   SPI functions end 
+*  ============================================================================================================================================================================*/
 
-//SPI functions ends
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//LCD functions begin
-
+/* =============================================================================================================================================================================
+*   LCD functions begin 
+*  ============================================================================================================================================================================*/
 /**
  * @brief Clears LCD screen
  * @param[in]: color: Specifies the color of the screen to be cleared to
@@ -434,8 +434,8 @@ static void setWindow(const uint16_t xs, const uint16_t xe, const uint16_t ys, c
  * @param[in] color: Color to be filled
  */
 static void fillWindow(const uint16_t xs, uint16_t xe, const uint16_t ys, uint16_t ye, color color){
-	dma_lcd_wr_cmd(RAMWR);       						// RAMWR (start writing to RAM)
-	(xe = (xe > 240 ? LCD_X_MAX : xe));					//Make sure end coordinates is within range
+	dma_lcd_wr_cmd(RAMWR);       		// RAMWR (start writing to RAM)
+	(xe = (xe > 240 ? LCD_X_MAX : xe));	//Make sure end coordinates is within range
 	(ye = (ye > 240 ? LCD_Y_MAX : ye));
 	uint16_t dx = xe - xs + 1, dy = ye - ys + 1;
 
@@ -471,8 +471,8 @@ void lcd_drawPixel_big(const uint16_t x, const uint16_t y, color color){
  * @param[in] ye: row end coordinate 	[ys <= ye <= 240]
  */
 void lcd_drawLine(uint16_t xs, uint16_t xe, uint16_t ys, uint16_t ye, color color){
-		// Specialfall: vertikal linje
-	 if (xs == xe) {						//Vertical line
+	// Vertikal linje
+	 if (xs == xe) {	
 		 if (ys > ye) { uint16_t tmp = ys; ys = ye; ye = tmp; }
 		 setWindow(xs, xs, ys, ye);
 		 for (uint16_t y = ys; y <= ye; y++) {
@@ -481,8 +481,8 @@ void lcd_drawLine(uint16_t xs, uint16_t xe, uint16_t ys, uint16_t ye, color colo
 		return;
 	}
 
-	// Specialfall: horisontell linje
-	if (ys == ye) {							//Horizontal line
+	// Horizontal line 
+	if (ys == ye) {							
 		if (xs > xe) { uint16_t tmp = xs; xs = xe; xe = tmp; }
 		setWindow(xs, xe, ys, ys);
 		for (uint16_t x = xs; x <= xe; x++) {
@@ -491,17 +491,17 @@ void lcd_drawLine(uint16_t xs, uint16_t xe, uint16_t ys, uint16_t ye, color colo
 		return;
 	}
 
-	//Bresenham's linjealgoritm. Given by ChatGPT
+	//Bresenham's line algorithm
 	int16_t dx = (xe > xs ? xe - xs : xs - xe);	//Abs val
-	int16_t dy = -(ye > ys ? ye - ys : ys - ye);//(-)Abs val
-	int16_t sx = (xs < xe) ? 1 : -1;			//Direction of x
-	int16_t sy = (ys < ye) ? 1 : -1;			//Direction of y
-	int16_t err = dx + dy;						//Error term
+	int16_t dy = -(ye > ys ? ye - ys : ys - ye);    //(-)Abs val
+	int16_t sx = (xs < xe) ? 1 : -1;		//Direction of x
+	int16_t sy = (ys < ye) ? 1 : -1;		//Direction of y
+	int16_t err = dx + dy;				//Error term
 
 	while (1) {
 		lcd_drawPixel(xs, ys, color);			//Draw pixel
 		if (xs == xe && ys == ye) break;		//If both coordinates start = end pos then break
-		int16_t e2 = err << 1;					//err * 2
+		int16_t e2 = err << 1;				//err * 2
 		if (e2 >= dy) {							
 			err += dy;
 			xs += sx;
@@ -626,9 +626,9 @@ void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, const co
 	int offset = (var_y << 1) * (ch - ' ');
 
 	//Set window size
-	uint8_t x = xs - (STD_FONT_X_SIZE >> 1);				//Calc leftmost corner..-
+	uint8_t x = xs - (STD_FONT_X_SIZE >> 1);		  //Calc leftmost corner..-
 	uint8_t y = ys - (var_y >> 1);							
-	setWindow(x, x + STD_FONT_X_SIZE - 1, y, y + var_y - 1);//... and set window
+	setWindow(x, x + STD_FONT_X_SIZE - 1, y, y + var_y - 1); //... and set window
 
 	//Write char
 	for(uint8_t i = 0; i < (var_y << 1); i++){
@@ -636,6 +636,7 @@ void lcd_ShowCh(const uint16_t xs, const uint16_t ys, const uint8_t ch, const co
 			//Check each bit of each element. If 0b1 => Write new col, else keep current background color
 			color set_color = ( (((font_type[i + offset] >> j) & 1U ) == 1 ) ? _color : curr_backgr); 
 			dma_lcd_wr_data(set_color,1);
+
 		}
 	}
 }
@@ -690,8 +691,8 @@ void lcd_showStr(const uint16_t xs, const uint16_t ys, const char *str, const co
 void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _color){
 
 	if (val == 0) {
-    lcd_ShowCh(xs, ys,'0', _color);
-    return;
+		lcd_ShowCh(xs, ys,'0', _color);
+		return;
 	}
 
 	//Select font
@@ -704,19 +705,19 @@ void lcd_showNum(const uint16_t xs, const uint16_t ys, int val, const color _col
 	long BASE = 100000000;
 	uint8_t ind = 0;
 	while( (val / BASE) == 0 && BASE > 1) BASE /= 10;
-	
+
 	while( BASE > 0 && ind < 16 ){
 		uint8_t curr_val = val / BASE;		//Get next MSB digit
 		val -= (curr_val * BASE);			//Subtract
 		BASE /= 10;							//Adjust base
 
 		int offset = (var_y << 1) * (curr_val + '0' - ' ');								//Get correct character
-	
+
 		//Set window size
 		uint8_t x = xs - (STD_FONT_X_SIZE >> 1) + (STD_FONT_X_SIZE * ind);				//Calc leftmost corner...
 		uint8_t y = ys - (var_y >> 1);							
 		setWindow(x, x + STD_FONT_X_SIZE - 1, y, y + var_y - 1);						//... and set window
-	
+
 		//Write char
 		for(uint8_t i = 0; i < (var_y << 1); i++){
 			for(int8_t j = 7; j >= 0; j--){
@@ -839,16 +840,20 @@ void lcd_showPicture(uint8_t *bitMap){
     }
 }
 
-//LCD functions ends
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Auxillary functions
+/* =============================================================================================================================================================================
+*   LCD functions end 
+*  ============================================================================================================================================================================*/
+
+/* =============================================================================================================================================================================
+*   Auxillary functions begin 
+*  ============================================================================================================================================================================*/
 /**
  * @brief Delays (blocking)
  * @param[in] ms: Amount of ms to delay
  */
 static void delay_ms(uint16_t ms){
-	volatile long long base = 7200; 	//Base
-	base = base*(long long)ms;			//Mult base with ms
+	volatile long long base = 7200;
+	base = base*(long long)ms;
 	while(--base) __asm__ volatile("nop");
 }
 static inline void dc_set(void) {
@@ -866,3 +871,6 @@ static inline void cs_set(void) {
 static inline void cs_clr(void) {
     gpio_bit_reset(sel_params->_cs.gpio_periph, sel_params->_cs.gpio_pin);
 }
+/* =============================================================================================================================================================================
+*   Auxillary functions end 
+*  ============================================================================================================================================================================*/
