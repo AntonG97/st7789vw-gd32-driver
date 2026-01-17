@@ -214,7 +214,7 @@ static void lcd_dma_init(uint32_t _dma_periph, dma_channel_enum _channel, uint32
 	dma_init_struct.periph_addr = (uint32_t)((_spi_perpih) + 0x0CU);
 	dma_init_struct.periph_inc = DMA_PERIPH_INCREASE_DISABLE; 		
 	dma_init_struct.periph_width = DMA_PERIPHERAL_WIDTH_16BIT; 		//SPIx 16 bit data
-	dma_init_struct.priority = DMA_PRIORITY_HIGH;					//Priority
+	dma_init_struct.priority = DMA_PRIORITY_LOW;					//Priority
 	
 	dma_init(sel_params->_dma_periph, sel_params->_dma_channel, &dma_init_struct);
 }
