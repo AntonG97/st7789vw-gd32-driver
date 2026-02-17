@@ -1,0 +1,33 @@
+
+w +$qSupported:multiprocess+;swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+#df
+r $S05#B8
+w +
+r +$PacketSize=109;hwbreak+#14
+w +$vMustReplyEmpty#3a
+r +$#00
+w +$Hg0#df
+r +$OK#9A
+w +$qTStatus#49
+r +$#00
+w +$?#3f
+r +$S05#B8
+w +$qfThreadInfo#bb
+r +$1el#02
+w +$Hc-1#09
+r +$OK#9A
+w +$qC#b4
+r +$#00
+w +$qAttached#8f
+r +$0#30
+w +$qOffsets#4b
+r +$Text=0;Data=0;Bss=0;#3F
+w +$g#67
+r +$0000000030070008E07F0020C0110020000000000000000000000000000000000A00000000000000283B0008010000000000000000000000090000000A000000140400009A4F02000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000FF0700000000000000000000283B0008#C9
+w +$qfThreadInfo#bb
+r +$1el#02
+w +$qSymbol::#5b
+r +$OK#9A
+w +
+c kill
+w $vKill;a410#33
+End of log

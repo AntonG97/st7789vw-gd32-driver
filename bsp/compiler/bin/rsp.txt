@@ -1,0 +1,35 @@
+
+w +$qSupported:multiprocess+;swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+#df
+r Get basic CSR's for supported hardware breakpoints\r\n\rHardware breakpoint 0: tdata1 = 21800000, tdata2 = 0, tdata3 = 0\r\n\rHardware breakpoint 1: tdata1 = 21800000, tdata2 = 0, tdata3 = 0\r\n\rHardware breakpoint 2: tdata1 = 21800000, tdata2 = 0, tdata3 = 0\r\n\rHardware breakpoint 3: tdata1 = 21800000, tdata2 = 0, tdata3 = 0\r\n\rNo more breakpoints!\r\n\r\r\n\rRead trap handler adress...\r\n\rtvec = 8003fc3, handle_trap = 8003980\r\n\rend of test\r\n\rx0 = 0x0\r\n\rx1 = 0x8000d60\r\n\rx2 = 0x20007fe0\r\n\rx3 = 0x20001108\r\n\rx4 = 0x0\r\n\rx5 = 0x0\r\n\rx6 = 0x8005622\r\n\rx7 = 0x0\r\n\rx8 = 0x80003d4\r\n\rx9 = 0x4\r\n\rx10 = 0xe\r\n\rx11 = 0xd\r\n\rx12 = 0x20000ef4\r\n\rx13 = 0xe\r\n\rx14 = 0x20001031\r\n\rx15 = 0x0\r\n\rx16 = 0x2\r\n\rx17 = 0x24fee\r\n\rx18 = 0x0\r\n\rx19 = 0x9\r\n\rx20 = 0x8000910\r\n\rx21 = 0x0\r\n\rx22 = 0x0\r\n\rx23 = 0x0\r\n\rx24 = 0x0\r\n\rx25 = 0x0\r\n\rx26 = 0x0\r\n\rx27 = 0x0\r\n\rx28 = 0x0\r\n\rx29 = 0x7ff\r\n\rx30 = 0x0\r\n\rx31 = 0x0\r\n\rPC = 0x8003f28\r\n\rInstruction = 0x974531\r\n\rCompressed instruction\r\n\rNext instruction: 0x8003f2a\r\n\r$PacketSize=109#CA
+w +
+r <Timeout: 2 seconds>
+w $qSupported:multiprocess+;swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+#df
+r $PacketSize=109#CA
+w +
+r <Timeout: 2 seconds>
+w $qSupported:multiprocess+;swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+#df
+r $PacketSize=109#CA
+w +
+r <Timeout: 2 seconds>
+w $qSupported:multiprocess+;swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+#df
+r $PacketSize=109#CA
+w +
+r <Timeout: 2 seconds><Timeout: 2 seconds>
+w -
+r <Timeout: 2 seconds>
+w -
+r <Timeout: 2 seconds>
+w -+$vMustReplyEmpty#3a
+r <Timeout: 2 seconds>
+w $vMustReplyEmpty#3a
+r <Timeout: 2 seconds>
+w $vMustReplyEmpty#3a
+r <Timeout: 2 seconds>
+w $vMustReplyEmpty#3a
+r <Timeout: 2 seconds><Timeout: 2 seconds>
+w -
+r <Timeout: 2 seconds>
+w -
+r <Timeout: 2 seconds>
+w -+
+End of log

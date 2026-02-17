@@ -1,0 +1,67 @@
+
+w +$qSupported:multiprocess+;swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+#df
+r $S05#B8
+w +
+r +$PacketSize=109;hwbreak+#14
+w +$vMustReplyEmpty#3a
+r +$#00
+w +$Hg0#df
+r +$OK#9A
+w +$qTStatus#49
+r +$#00
+w +$?#3f
+r +$S05#B8
+w +$qfThreadInfo#bb
+r +$1el#02
+w +$Hc-1#09
+r +$OK#9A
+w +$qC#b4
+r +$#00
+w +$qAttached#8f
+r +$0#30
+w +$g#67
+r +$00000000BE070008F07F0020081100200000000000000000000000800000000004000000090000000100000001000000000000000000000014040000804F020014040000D94F02000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000FF0700000000000000000000283C0008#D8
+w +$qfThreadInfo#bb
+r +$1el#02
+w +$m0,2#fb
+r +$B1AA#F5
+w +
+c 1006-thread-info 1
+w $qfThreadInfo#bb
+r +$1el#02
+w +
+c 1007-interpreter-exec console "set pagination off"
+c set pagination off
+c 1008-gdb-set auto-solib-add on
+c set auto-solib-add on
+c 1009-gdb-set solib-search-path /home/remahl/toolchain-gd32v/toolchain-gd32v-linux/projects/usb_debug_test/build:
+c set solib-search-path /home/remahl/toolchain-gd32v/toolchain-gd32v-linux/projects/usb_debug_test/build:
+c 1010-environment-cd /home/remahl/toolchain-gd32v/toolchain-gd32v-linux/projects/usb_debug_test
+c cd /home/remahl/toolchain-gd32v/toolchain-gd32v-linux/projects/usb_debug_test
+c 1011-file-exec-and-symbols /home/remahl/toolchain-gd32v/toolchain-gd32v-linux/projects/usb_debug_test/build/gd32vf103.elf
+c file /home/remahl/toolchain-gd32v/toolchain-gd32v-linux/projects/usb_debug_test/build/gd32vf103.elf
+w $qSymbol::#5b
+r +$OK#9A
+w +$qSymbol::#5b
+r +$OK#9A
+w +$g#67
+r +$00000000BE070008F07F0020081100200000000000000000000000800000000004000000090000000100000001000000000000000000000014040000804F020014040000D94F02000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000FF0700000000000000000000283C0008#D8
+w +
+c 1012-interpreter-exec console "show architecture"
+c show architecture
+c 1013-break-insert -f main
+w $m8000680,40#63
+r +$34353637383961626364656600000000232D302B20000000686C4C006566674546470000B74700084111938707CC06C622C426C24AC093E73700739057301305#7D
+w +$m80006a4,4#60
+r +$B7470008#AC
+w +
+c 1014-target-select remote /dev/ttyACM0
+c target remote /dev/ttyACM0
+w $vKill;a410#33
+r +<Timeout: 2 seconds>
+w -
+r <Timeout: 2 seconds>
+w -
+r <Timeout: 2 seconds>
+w -+
+End of log
