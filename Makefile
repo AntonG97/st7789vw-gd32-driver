@@ -152,7 +152,7 @@ ctags:
 $(BUILD_DIR):
 	@mkdir -p $@
 
-.PHONY: all clean debug flash
+.PHONY: all clean debug flash 
 clean:
 	@rm -rf $(BUILD_DIR)
 
