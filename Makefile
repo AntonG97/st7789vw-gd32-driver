@@ -11,6 +11,8 @@ BIN_DIR := $(BUILD_DIR)/bin
 
 SRC_DIR := drivers
 
+BOARD_DIR := board
+
 BSP_DIR := bsp
 HAL_DIR := $(BSP_DIR)/firmware/GD32VF103_standard_peripheral
 FIRMWARE_DIR := $(BSP_DIR)/firmware/RISCV
@@ -48,7 +50,8 @@ INCLUDES := \
 	-I$(HAL_DIR)/Include \
 	-I$(DRIVER_DIR) \
 	-I$(STUBS_DIR) \
-	-I$(SRC_DIR)
+	-I$(SRC_DIR) \
+	-I$(BOARD_DIR)
 #Optimization. Optimize for size
 OPT := -Os -ffunction-sections -fdata-sections
 
@@ -61,7 +64,7 @@ CFLAGS := $(ARCH) $(PPFLAGS) $(INCLUDES) $(OPT) $(DEBUG) $(WARN) \
 	  -ffreestanding
 
 CPPFLAGS := $(ARCH) $(PPFLAGS) $(INCLUDES) $(OPT) $(DEBUG) $(WARN) \
-	    -std=c++03 \
+	    -std=c++11 \
 	    -ffreestanding
 ################################################################################
 # Linker
